@@ -7,7 +7,9 @@ import { generateWorkout } from '../workout/workoutGenerator';
 import { generateWeeklySplit } from '../workout/splitGenerator';
 import { getExerciseById } from '../workout/exerciseDatabase';
 import { SystemVoice } from '../workout/SystemVoice';
-import { Play, Check, Timer, ChevronRight, Volume2, VolumeX, ShieldAlert } from 'lucide-react';
+import { HapticService } from '../workout/HapticService';
+import { SoundEffectService } from '../workout/SoundEffectService';
+import { Play, Check, Timer, ChevronRight, Volume2, VolumeX, ShieldAlert, Zap, ZapOff } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
@@ -20,6 +22,8 @@ export const Workout: React.FC = () => {
     cancelActiveWorkout,
     voiceEnabled,
     setVoiceEnabled,
+    soundsEnabled,
+    setSoundsEnabled,
     workoutHistory,
     weeklyPlan,
     setWeeklyPlan
@@ -32,56 +36,71 @@ export const Workout: React.FC = () => {
   
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false); // To show the UI indicator
+  const [isSpeaking, setIsSpeaking] = useState(false); 
 
-  // Update Weekly Plan when profile changes
+  useEffect(() => {
+    SoundEffectService.setEnabled(soundsEnabled);
+  }, [soundsEnabled]);
+
   useEffect(() => {
     if (profile.isCompleted) {
       const plan = generateWeeklySplit(profile);
       setWeeklyPlan(plan);
     }
-  }, [profile.trainingDays, profile.primaryGoal, profile.experienceLevel]);
+  }, [profile.trainingDays, profile.primaryGoal, profile.experienceLevel, setWeeklyPlan]);
 
-  // Generate a workout if we don't have one, or determine it's a rest day
   useEffect(() => {
     if (!activeWorkout && profile.isCompleted && !proposedWorkout && weeklyPlan.length > 0) {
       const generated = generateWorkout(profile);
-      setProposedWorkout(generated); // Might be null if rest day, handled below
+      setProposedWorkout(generated); 
     }
   }, [profile, activeWorkout, proposedWorkout, weeklyPlan]);
 
-  // Helper to trigger voice and UI animation
   const playVoice = (text: string) => {
     if (voiceEnabled) {
       setIsSpeaking(true);
       SystemVoice.speak(text, voiceEnabled);
-      // Rough approximation for UI animation duration (could be better with `onend` callback but synth is static)
+      // Rough approximation for UI animation duration
       setTimeout(() => setIsSpeaking(false), 3000); 
     }
   };
 
-  // Handle rest timer tick
   useEffect(() => {
     let interval: any = null;
     if (isResting && restTimeLeft > 0) {
       interval = setInterval(() => {
-        setRestTimeLeft(prev => prev - 1);
+        setRestTimeLeft(prev => {
+          const next = prev - 1;
+          // Play subtle tick sound on important countdown markers
+          if (next <= 10 && next > 0) {
+            HapticService.selection();
+            SoundEffectService.playClick();
+          }
+          return next;
+        });
       }, 1000);
     } else if (isResting && restTimeLeft === 0) {
       setIsResting(false);
       setViewState('active');
-      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.restComplete()));
       
-      // Also announce the next exercise if we just switched exercises
-      if (activeWorkout) {
-        const currentEx = activeWorkout.exercises[currentExerciseIndex];
-        const def = getExerciseById(currentEx.exerciseId);
-        if (currentSetIndex === 0 && def) {
-          setTimeout(() => {
-            playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(def.name)));
-          }, 3000);
+      // Rest Complete Sequence
+      HapticService.confirm();
+      SoundEffectService.playNotification();
+      
+      setTimeout(() => {
+        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.restComplete()));
+        
+        // Announce next exercise if starting a new one
+        if (activeWorkout && currentSetIndex === 0) {
+          const currentEx = activeWorkout.exercises[currentExerciseIndex];
+          const def = getExerciseById(currentEx.exerciseId);
+          if (def) {
+            setTimeout(() => {
+              playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(currentExerciseIndex + 1, def.voiceName)));
+            }, 3000);
+          }
         }
-      }
+      }, 500); // Wait for sound effect to finish
     }
     return () => clearInterval(interval);
   }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex]);
@@ -104,12 +123,20 @@ export const Workout: React.FC = () => {
   const todayStr = days[new Date().getDay()];
   const todayPlan = weeklyPlan.find(p => p.dayOfWeek === todayStr);
 
-  // If today is a rest day and no active workout is running
   if (!activeWorkout && todayPlan?.isRestDay) {
-    // If they just opened the app, play the rest day voice once (could get annoying, so we'll skip for now unless requested)
     return (
       <div className={styles.screenContainer}>
-        <div className={styles.systemOuterFrame} style={{ minHeight: '60vh', textAlign: 'center', justifyContent: 'center' }}>
+        <div className={styles.systemOuterFrame} style={{ minHeight: '60vh', textAlign: 'center', justifyContent: 'center', position: 'relative' }}>
+          
+          <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '16px' }}>
+            <button onClick={() => setSoundsEnabled(!soundsEnabled)} style={{ background: 'none', border: 'none', color: soundsEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
+              {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
+            </button>
+            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{ background: 'none', border: 'none', color: voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
+              {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+          </div>
+
           <div className={styles.statusTitleBox} style={{ color: 'var(--text-secondary)', borderColor: 'var(--text-secondary)' }}>
             TODAY'S STATUS
           </div>
@@ -125,7 +152,6 @@ export const Workout: React.FC = () => {
     );
   }
 
-  // Determine which workout to show (active or proposed)
   const displayWorkout = activeWorkout || proposedWorkout;
 
   if (!displayWorkout) {
@@ -143,6 +169,14 @@ export const Workout: React.FC = () => {
   }
 
   const handleStartWorkout = () => {
+    // 1. Initialize Audio/Voice Context on intentional user interaction
+    SoundEffectService.init();
+    SystemVoice.init();
+    
+    // 2. Play Haptic and Button Sound
+    HapticService.light();
+    SoundEffectService.playMissionStart();
+
     if (proposedWorkout) {
       startWorkout(proposedWorkout);
     }
@@ -150,97 +184,134 @@ export const Workout: React.FC = () => {
     setCurrentExerciseIndex(0);
     setCurrentSetIndex(0);
 
-    const protocolName = activeWorkout ? activeWorkout.workoutName : proposedWorkout?.workoutName;
-    playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startWorkout(protocolName || 'Protocol')));
-    
-    // Announce first exercise shortly after
+    // 3. Play Voice (wait a bit for sound effect)
     setTimeout(() => {
-      const firstExId = (activeWorkout || proposedWorkout)?.exercises[0]?.exerciseId;
-      if (firstExId) {
-        const def = getExerciseById(firstExId);
-        if (def) playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(def.name)));
-      }
-    }, 3000);
+      const protocolName = activeWorkout ? activeWorkout.workoutName : proposedWorkout?.workoutName;
+      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startWorkout(protocolName || 'Protocol')));
+      
+      setTimeout(() => {
+        const firstExId = (activeWorkout || proposedWorkout)?.exercises[0]?.exerciseId;
+        if (firstExId) {
+          const def = getExerciseById(firstExId);
+          if (def) {
+            playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(1, def.voiceName)));
+            
+            setTimeout(() => {
+              const currentEx = (activeWorkout || proposedWorkout)?.exercises[0];
+              const firstSet = currentEx?.sets[0];
+              if (firstSet) {
+                 const type = def.movementType === 'repetition' ? 'reps' : 'time';
+                 const amount = type === 'reps' ? firstSet.targetReps || 0 : firstSet.targetDuration || 0;
+                 playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(1, type, amount)));
+              }
+            }, 3500);
+          }
+        }
+      }, 4000);
+    }, 800);
   };
 
   const handleCompleteSet = () => {
     if (!activeWorkout) return;
     
+    // 1. Button Press Haptic & Sound
+    HapticService.confirm();
+    SoundEffectService.playConfirm();
+
     updateActiveSet(currentExerciseIndex, currentSetIndex, { completed: true });
     
     const currentEx = activeWorkout.exercises[currentExerciseIndex];
     const isLastSet = currentSetIndex >= currentEx.sets.length - 1;
     const isLastExercise = currentExerciseIndex >= activeWorkout.exercises.length - 1;
 
-    if (isLastSet && isLastExercise) {
-      completeActiveWorkout();
-      setViewState('summary');
-      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.workoutComplete()));
-    } else if (isLastSet) {
-      const exDef = getExerciseById(currentEx.exerciseId);
-      setRestTimeLeft(exDef?.defaultRest || 60);
-      setIsResting(true);
-      setViewState('rest');
-      setCurrentExerciseIndex(prev => prev + 1);
-      setCurrentSetIndex(0);
-      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.exerciseComplete()));
-    } else {
-      const exDef = getExerciseById(currentEx.exerciseId);
-      setRestTimeLeft(exDef?.defaultRest || 60);
-      setIsResting(true);
-      setViewState('rest');
-      setCurrentSetIndex(prev => prev + 1);
-      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.setComplete()));
-    }
+    setTimeout(() => {
+      if (isLastSet && isLastExercise) {
+        completeActiveWorkout();
+        setViewState('summary');
+        SoundEffectService.playMissionComplete();
+        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.workoutComplete())), 800);
+      } else if (isLastSet) {
+        const exDef = getExerciseById(currentEx.exerciseId);
+        setRestTimeLeft(exDef?.defaultRest || 60);
+        setIsResting(true);
+        setViewState('rest');
+        setCurrentExerciseIndex(prev => prev + 1);
+        setCurrentSetIndex(0);
+        
+        SoundEffectService.playNotification();
+        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.setComplete())), 500);
+      } else {
+        const exDef = getExerciseById(currentEx.exerciseId);
+        setRestTimeLeft(exDef?.defaultRest || 60);
+        setIsResting(true);
+        setViewState('rest');
+        setCurrentSetIndex(prev => prev + 1);
+        
+        SoundEffectService.playNotification();
+        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.setComplete())), 500);
+      }
+    }, 400); // Delay UI transition slightly after click sound
   };
 
   const skipRest = () => {
+    HapticService.light();
+    SoundEffectService.playButton();
     setIsResting(false);
     setRestTimeLeft(0);
     setViewState('active');
-    playVoice("Recovery skipped.");
   };
 
-  // Helper to find previous performance
   const getPreviousPerformance = (exerciseId: string) => {
     for (const session of workoutHistory) {
       const ex = session.exercises.find(e => e.exerciseId === exerciseId);
       if (ex && ex.sets.some(s => s.completed)) {
-        // Return the first completed set's data
-        const completedSet = ex.sets.find(s => s.completed);
-        return completedSet;
+        return ex.sets.find(s => s.completed);
       }
     }
     return null;
   };
 
-  const renderVoiceIndicator = () => (
+  const renderSensoryControls = () => (
     <div style={{
       position: 'absolute', top: '16px', right: '16px',
-      display: 'flex', alignItems: 'center', gap: '8px',
-      color: isSpeaking ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-      transition: 'all 0.3s ease',
-      opacity: isSpeaking ? 1 : 0.5
+      display: 'flex', alignItems: 'center', gap: '16px',
     }}>
-      {isSpeaking && <span className={styles.labelDim} style={{ color: 'var(--accent-cyan)' }}>SYSTEM</span>}
       <button 
         onClick={() => {
-          setVoiceEnabled(!voiceEnabled);
-          if (voiceEnabled) SystemVoice.cancel();
+          HapticService.selection();
+          setSoundsEnabled(!soundsEnabled);
+          if (!soundsEnabled) {
+             // Will play after state updates
+             setTimeout(() => SoundEffectService.playClick(), 50);
+          }
         }}
-        style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+        style={{ background: 'none', border: 'none', color: soundsEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}
       >
-        {voiceEnabled ? <Volume2 size={20} className={isSpeaking ? 'pulse-anim' : ''} /> : <VolumeX size={20} />}
+        {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
       </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isSpeaking ? 'var(--accent-cyan)' : (voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)') }}>
+        {isSpeaking && <span className={styles.labelDim} style={{ color: 'var(--accent-cyan)' }}>SYSTEM</span>}
+        <button 
+          onClick={() => {
+            HapticService.selection();
+            SoundEffectService.playClick();
+            setVoiceEnabled(!voiceEnabled);
+            if (voiceEnabled) SystemVoice.cancel();
+          }}
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+        >
+          {voiceEnabled ? <Volume2 size={20} className={isSpeaking ? 'pulse-anim' : ''} /> : <VolumeX size={20} />}
+        </button>
+      </div>
     </div>
   );
 
   const renderOverview = () => (
     <div className={styles.systemOuterFrame} style={{ position: 'relative' }}>
-      {renderVoiceIndicator()}
+      {renderSensoryControls()}
       <div className={styles.statusTitleBox}>TODAY'S MISSION</div>
       
-      {/* Weekly Plan Mini-View */}
       <div style={{ display: 'flex', gap: '4px', margin: '16px 0', overflowX: 'auto', paddingBottom: '8px' }}>
         {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => {
           const plan = weeklyPlan.find(p => p.dayOfWeek === day);
@@ -289,7 +360,7 @@ export const Workout: React.FC = () => {
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', padding: '8px', backgroundColor: 'var(--bg-surface)' }}>
               <div>
                 <span style={{ color: 'var(--accent-cyan)', marginRight: '12px' }}>0{i + 1}</span>
-                <span style={{ fontWeight: 'bold' }}>{def?.name.toUpperCase()}</span>
+                <span style={{ fontWeight: 'bold' }}>{def?.name}</span>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginLeft: '28px', marginTop: '4px' }}>
                   {def?.muscleGroup.toUpperCase()}
                 </div>
@@ -317,7 +388,11 @@ export const Workout: React.FC = () => {
       
       {activeWorkout && (
         <button 
-          onClick={cancelActiveWorkout}
+          onClick={() => {
+            HapticService.light();
+            SoundEffectService.playButton();
+            cancelActiveWorkout();
+          }}
           style={{ width: '100%', padding: '12px', marginTop: '12px', background: 'transparent', border: 'none', color: 'var(--accent-alert)', fontFamily: 'var(--font-system)' }}
         >
           ABORT MISSION
@@ -336,7 +411,7 @@ export const Workout: React.FC = () => {
 
     return (
       <div className={styles.systemOuterFrame} style={{ minHeight: '70vh', position: 'relative' }}>
-        {renderVoiceIndicator()}
+        {renderSensoryControls()}
         <div className={styles.statusTitleBox} style={{ color: 'var(--accent-alert)', borderColor: 'var(--accent-alert)' }}>
           MISSION IN PROGRESS
         </div>
@@ -347,7 +422,7 @@ export const Workout: React.FC = () => {
         </div>
 
         <h2 className="system-title" style={{ fontSize: '2rem', textAlign: 'center', marginBottom: '16px' }}>
-          {def?.name.toUpperCase()}
+          {def?.name}
         </h2>
 
         {prevPerf && (
@@ -384,7 +459,7 @@ export const Workout: React.FC = () => {
   const renderRest = () => {
     return (
       <div className={styles.systemOuterFrame} style={{ minHeight: '70vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        {renderVoiceIndicator()}
+        {renderSensoryControls()}
         <Timer size={48} style={{ color: 'var(--text-secondary)', marginBottom: '24px' }} />
         <div className={styles.labelDim} style={{ letterSpacing: '4px' }}>RECOVERY PHASE</div>
         
@@ -394,7 +469,11 @@ export const Workout: React.FC = () => {
         
         <div style={{ display: 'flex', gap: '16px' }}>
           <button 
-            onClick={() => setRestTimeLeft(prev => prev + 30)}
+            onClick={() => {
+              HapticService.selection();
+              SoundEffectService.playClick();
+              setRestTimeLeft(prev => prev + 30);
+            }}
             style={{
               padding: '12px 24px', backgroundColor: 'transparent', 
               border: '1px solid var(--border-thin)', color: 'var(--text-primary)', 
@@ -421,7 +500,7 @@ export const Workout: React.FC = () => {
 
   const renderSummary = () => (
     <div className={styles.systemOuterFrame} style={{ minHeight: '70vh', textAlign: 'center', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {renderVoiceIndicator()}
+      {renderSensoryControls()}
       <div className={styles.statusTitleBox} style={{ color: '#10b981', borderColor: '#10b981' }}>
         MISSION COMPLETE
       </div>
@@ -446,7 +525,12 @@ export const Workout: React.FC = () => {
       
       <div style={{ marginTop: 'auto' }}>
         <button 
-          onClick={() => { setViewState('overview'); setProposedWorkout(null); }}
+          onClick={() => { 
+            HapticService.light();
+            SoundEffectService.playButton();
+            setViewState('overview'); 
+            setProposedWorkout(null); 
+          }}
           style={{
             width: '100%', padding: '16px', backgroundColor: 'transparent', 
             border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', 

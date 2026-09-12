@@ -7,6 +7,7 @@ export type MovementType = 'repetition' | 'timed';
 export interface ExerciseDef {
   id: string;
   name: string;
+  voiceName: string; // NEW
   muscleGroup: MuscleGroup;
   secondaryMuscles: MuscleGroup[];
   equipmentRequired: string[];
@@ -57,11 +58,13 @@ export interface TrainingDayPlan {
 interface WorkoutState {
   workoutHistory: WorkoutSession[];
   activeWorkout: WorkoutSession | null;
-  voiceEnabled: boolean; // NEW
-  weeklyPlan: TrainingDayPlan[]; // NEW
+  voiceEnabled: boolean;
+  soundsEnabled: boolean; // NEW
+  weeklyPlan: TrainingDayPlan[];
   
   // Actions
   setVoiceEnabled: (enabled: boolean) => void;
+  setSoundsEnabled: (enabled: boolean) => void; // NEW
   setWeeklyPlan: (plan: TrainingDayPlan[]) => void;
   startWorkout: (session: WorkoutSession) => void;
   updateActiveSet: (exerciseIndex: number, setIndex: number, data: Partial<WorkoutSet>) => void;
@@ -76,9 +79,11 @@ export const useWorkoutStore = create<WorkoutState>()(
       workoutHistory: [],
       activeWorkout: null,
       voiceEnabled: true,
+      soundsEnabled: true,
       weeklyPlan: [],
 
       setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
+      setSoundsEnabled: (enabled) => set({ soundsEnabled: enabled }),
       setWeeklyPlan: (plan) => set({ weeklyPlan: plan }),
 
       startWorkout: (session) => set({ activeWorkout: session }),

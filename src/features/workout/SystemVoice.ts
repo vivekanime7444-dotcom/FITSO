@@ -6,11 +6,22 @@ export class SystemVoice {
   public static init() {
     if (!this.synth) return;
     
-    // Try to find a good robotic/system sounding voice, usually a clear English female/male voice.
     const setVoice = () => {
       const voices = this.synth.getVoices();
-      // Prefer Google UK English Female, or Samantha on Mac, or Microsoft Zira
-      this.voice = voices.find(v => v.name.includes('Google UK English Female') || v.name.includes('Samantha') || v.name.includes('Zira')) || voices[0];
+      if (voices.length === 0) return;
+
+      // Prioritize English Male voices that sound natural/deep
+      const enMaleVoices = voices.filter(v => v.lang.startsWith('en') && (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('mark') || v.name.toLowerCase().includes('guy')));
+      const enVoices = voices.filter(v => v.lang.startsWith('en'));
+      
+      // Preferred deep voices if available (Google UK English Male, Microsoft David, etc.)
+      const preferred = enMaleVoices.find(v => v.name.includes('UK English Male')) || 
+                        enMaleVoices.find(v => v.name.includes('David')) ||
+                        enMaleVoices[0] ||
+                        enVoices[0] ||
+                        voices[0];
+                        
+      this.voice = preferred;
       this.isInitialized = true;
     };
 
@@ -24,16 +35,16 @@ export class SystemVoice {
     if (!enabled || !this.synth) return;
     if (!this.isInitialized) this.init();
 
-    this.synth.cancel(); // Cancel any ongoing speech to avoid overlap
+    this.synth.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
     if (this.voice) {
       utterance.voice = this.voice;
     }
     
-    // System voice characteristics
-    utterance.pitch = 0.9;
-    utterance.rate = 1.0;
+    // Male system trainer tuning (natural but slightly authoritative and calm)
+    utterance.pitch = 0.85; 
+    utterance.rate = 0.95;
     utterance.volume = 1.0;
 
     this.synth.speak(utterance);
@@ -45,40 +56,31 @@ export class SystemVoice {
     }
   }
 
-  // Pre-defined phrase generators
+  // Pre-defined phrase generators with correct English sentences
   public static getPhrases = {
     startWorkout: (protocolName: string) => [
-      `${protocolName} initiated.`,
-      `Protocol activated.`,
-      `Mission starting. Prepare yourself.`
+      `Training protocol initiated. ${protocolName} activated.`,
     ],
-    startExercise: (exerciseName: string) => [
-      `Next exercise: ${exerciseName}. Prepare.`,
-      `${exerciseName}. Begin.`
+    startExercise: (exerciseNum: number, exerciseName: string) => [
+      `Exercise ${exerciseNum}. ${exerciseName}. Prepare.`,
     ],
-    startSet: (setNum: number, target: string) => [
-      `Set ${setNum}. Target: ${target}.`,
-      `Begin set ${setNum}.`
-    ],
+    startSet: (setNum: number, targetType: 'reps' | 'time', targetAmount: number) => {
+      if (targetType === 'reps') {
+        return [`Set ${setNum}. Target ${targetAmount} repetitions.`];
+      }
+      return [`Set ${setNum}. Target ${targetAmount} seconds.`];
+    },
     setComplete: () => [
-      `Set complete. Recovery initiated.`,
-      `Good. Set recorded.`,
-      `Set complete.`
+      `Set complete. Recovery protocol initiated.`,
     ],
     restComplete: () => [
       `Recovery complete. Prepare for the next set.`,
-      `Rest complete.`
-    ],
-    exerciseComplete: () => [
-      `Exercise complete.`,
-      `Target achieved.`
     ],
     workoutComplete: () => [
       `Mission complete. Training session recorded.`,
-      `Protocol finished. Excellent work.`
     ],
     restDay: () => [
-      `Recovery protocol active. No training mission scheduled today.`
+      `Recovery protocol active. No training mission is scheduled today.`
     ]
   };
 

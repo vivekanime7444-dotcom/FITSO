@@ -4,7 +4,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // BODYWEIGHT - CHEST / TRICEPS
   {
     id: 'pushup',
-    name: 'Push-Up',
+    name: 'PUSH-UP',
+    voiceName: 'Push-up',
     muscleGroup: 'Chest',
     secondaryMuscles: ['Triceps', 'Shoulders'],
     equipmentRequired: ['No Equipment'],
@@ -16,7 +17,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'diamond_pushup',
-    name: 'Diamond Push-Up',
+    name: 'DIAMOND PUSH-UP',
+    voiceName: 'Diamond push-up',
     muscleGroup: 'Triceps',
     secondaryMuscles: ['Chest'],
     equipmentRequired: ['No Equipment'],
@@ -28,10 +30,11 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'dips',
-    name: 'Dips',
+    name: 'DIPS',
+    voiceName: 'Dips',
     muscleGroup: 'Chest',
     secondaryMuscles: ['Triceps', 'Shoulders'],
-    equipmentRequired: ['Dip Bar'], // Or 'No Equipment' if using chairs, but keeping strict for now
+    equipmentRequired: ['Dip Bar'], 
     difficulty: 'Intermediate',
     movementType: 'repetition',
     defaultSets: 3,
@@ -42,7 +45,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // BODYWEIGHT - BACK / BICEPS
   {
     id: 'pullup',
-    name: 'Pull-Up',
+    name: 'PULL-UP',
+    voiceName: 'Pull-up',
     muscleGroup: 'Back',
     secondaryMuscles: ['Biceps', 'Shoulders'],
     equipmentRequired: ['Pull-up Bar'],
@@ -54,7 +58,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'chinup',
-    name: 'Chin-Up',
+    name: 'CHIN-UP',
+    voiceName: 'Chin-up',
     muscleGroup: 'Back',
     secondaryMuscles: ['Biceps'],
     equipmentRequired: ['Pull-up Bar'],
@@ -66,10 +71,11 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'bodyweight_row',
-    name: 'Bodyweight Row',
+    name: 'BW ROW',
+    voiceName: 'Bodyweight row',
     muscleGroup: 'Back',
     secondaryMuscles: ['Biceps'],
-    equipmentRequired: ['Pull-up Bar', 'Dip Bar'], // Requires something to hang from horizontally
+    equipmentRequired: ['Pull-up Bar', 'Dip Bar'], 
     difficulty: 'Beginner',
     movementType: 'repetition',
     defaultSets: 3,
@@ -80,7 +86,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // BODYWEIGHT - LEGS
   {
     id: 'bodyweight_squat',
-    name: 'Bodyweight Squat',
+    name: 'BW SQUAT',
+    voiceName: 'Bodyweight squat',
     muscleGroup: 'Legs',
     secondaryMuscles: ['Glutes', 'Core'],
     equipmentRequired: ['No Equipment'],
@@ -92,7 +99,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'lunges',
-    name: 'Walking Lunges',
+    name: 'LUNGES',
+    voiceName: 'Walking lunges',
     muscleGroup: 'Legs',
     secondaryMuscles: ['Glutes'],
     equipmentRequired: ['No Equipment'],
@@ -104,7 +112,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'jump_squat',
-    name: 'Jump Squat',
+    name: 'JUMP SQUAT',
+    voiceName: 'Jump squat',
     muscleGroup: 'Legs',
     secondaryMuscles: ['Conditioning'],
     equipmentRequired: ['No Equipment'],
@@ -118,7 +127,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // CORE
   {
     id: 'plank',
-    name: 'Plank',
+    name: 'PLANK',
+    voiceName: 'Plank',
     muscleGroup: 'Core',
     secondaryMuscles: ['Shoulders'],
     equipmentRequired: ['No Equipment'],
@@ -131,7 +141,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'crunches',
-    name: 'Crunches',
+    name: 'CRUNCHES',
+    voiceName: 'Crunches',
     muscleGroup: 'Core',
     secondaryMuscles: [],
     equipmentRequired: ['No Equipment'],
@@ -143,7 +154,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'hanging_leg_raises',
-    name: 'Hanging Leg Raises',
+    name: 'HANGING LEG RAISES',
+    voiceName: 'Hanging leg raises',
     muscleGroup: 'Core',
     secondaryMuscles: ['Back'],
     equipmentRequired: ['Pull-up Bar'],
@@ -157,10 +169,11 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // DUMBBELLS
   {
     id: 'db_bench_press',
-    name: 'Dumbbell Bench Press',
+    name: 'DB BENCH PRESS',
+    voiceName: 'Dumbbell bench press',
     muscleGroup: 'Chest',
     secondaryMuscles: ['Triceps', 'Shoulders'],
-    equipmentRequired: ['Dumbbells', 'Bench'], // Ideally bench, but floor press is fallback
+    equipmentRequired: ['Dumbbells', 'Bench'], 
     difficulty: 'Beginner',
     movementType: 'repetition',
     defaultSets: 3,
@@ -169,7 +182,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_floor_press',
-    name: 'Dumbbell Floor Press',
+    name: 'DB FLOOR PRESS',
+    voiceName: 'Dumbbell floor press',
     muscleGroup: 'Chest',
     secondaryMuscles: ['Triceps'],
     equipmentRequired: ['Dumbbells'],
@@ -181,7 +195,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_row',
-    name: 'Dumbbell Row',
+    name: 'DB ROW',
+    voiceName: 'Dumbbell row',
     muscleGroup: 'Back',
     secondaryMuscles: ['Biceps'],
     equipmentRequired: ['Dumbbells'],
@@ -193,7 +208,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_shoulder_press',
-    name: 'Dumbbell Shoulder Press',
+    name: 'DB SHOULDER PRESS',
+    voiceName: 'Dumbbell shoulder press',
     muscleGroup: 'Shoulders',
     secondaryMuscles: ['Triceps'],
     equipmentRequired: ['Dumbbells'],
@@ -205,7 +221,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_lateral_raise',
-    name: 'Lateral Raises',
+    name: 'DB LATERAL RAISE',
+    voiceName: 'Dumbbell lateral raise',
     muscleGroup: 'Shoulders',
     secondaryMuscles: [],
     equipmentRequired: ['Dumbbells'],
@@ -217,7 +234,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_bicep_curl',
-    name: 'Dumbbell Bicep Curl',
+    name: 'DB CURL',
+    voiceName: 'Dumbbell bicep curl',
     muscleGroup: 'Biceps',
     secondaryMuscles: [],
     equipmentRequired: ['Dumbbells'],
@@ -229,10 +247,11 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_goblet_squat',
-    name: 'Goblet Squat',
+    name: 'GOBLET SQUAT',
+    voiceName: 'Goblet squat',
     muscleGroup: 'Legs',
     secondaryMuscles: ['Core', 'Glutes'],
-    equipmentRequired: ['Dumbbells'], // Can also be Kettlebell
+    equipmentRequired: ['Dumbbells'], 
     difficulty: 'Beginner',
     movementType: 'repetition',
     defaultSets: 3,
@@ -241,7 +260,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'db_rdl',
-    name: 'Dumbbell RDL',
+    name: 'DB RDL',
+    voiceName: 'Dumbbell Romanian deadlift',
     muscleGroup: 'Glutes',
     secondaryMuscles: ['Legs', 'Core'],
     equipmentRequired: ['Dumbbells'],
@@ -255,7 +275,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // BARBELL
   {
     id: 'bb_bench_press',
-    name: 'Barbell Bench Press',
+    name: 'BB BENCH PRESS',
+    voiceName: 'Barbell bench press',
     muscleGroup: 'Chest',
     secondaryMuscles: ['Triceps', 'Shoulders'],
     equipmentRequired: ['Barbell', 'Bench'],
@@ -267,7 +288,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'bb_squat',
-    name: 'Barbell Squat',
+    name: 'BB SQUAT',
+    voiceName: 'Barbell squat',
     muscleGroup: 'Legs',
     secondaryMuscles: ['Glutes', 'Core'],
     equipmentRequired: ['Barbell'],
@@ -279,7 +301,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'bb_deadlift',
-    name: 'Deadlift',
+    name: 'DEADLIFT',
+    voiceName: 'Barbell deadlift',
     muscleGroup: 'Back',
     secondaryMuscles: ['Legs', 'Glutes', 'Core'],
     equipmentRequired: ['Barbell'],
@@ -291,7 +314,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'bb_ohp',
-    name: 'Overhead Press',
+    name: 'OVERHEAD PRESS',
+    voiceName: 'Barbell overhead press',
     muscleGroup: 'Shoulders',
     secondaryMuscles: ['Triceps', 'Core'],
     equipmentRequired: ['Barbell'],
@@ -303,7 +327,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'bb_row',
-    name: 'Barbell Row',
+    name: 'BB ROW',
+    voiceName: 'Barbell row',
     muscleGroup: 'Back',
     secondaryMuscles: ['Biceps', 'Core'],
     equipmentRequired: ['Barbell'],
@@ -317,7 +342,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   // CONDITIONING
   {
     id: 'burpees',
-    name: 'Burpees',
+    name: 'BURPEES',
+    voiceName: 'Burpees',
     muscleGroup: 'Conditioning',
     secondaryMuscles: ['Full Body'],
     equipmentRequired: ['No Equipment'],
@@ -329,7 +355,8 @@ export const EXERCISE_DATABASE: ExerciseDef[] = [
   },
   {
     id: 'mountain_climbers',
-    name: 'Mountain Climbers',
+    name: 'MOUNTAIN CLIMBERS',
+    voiceName: 'Mountain climbers',
     muscleGroup: 'Conditioning',
     secondaryMuscles: ['Core'],
     equipmentRequired: ['No Equipment'],
