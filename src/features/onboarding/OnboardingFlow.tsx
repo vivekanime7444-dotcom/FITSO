@@ -186,7 +186,7 @@ export const OnboardingFlow: React.FC = () => {
   };
 
   const renderEquipment = () => {
-    const equipmentOptions = ['Pull-up Bar', 'Dumbbells', 'Barbells', 'Chest Expander'] as const;
+    const equipmentOptions = ['No Equipment', 'Pull-up Bar', 'Dumbbells', 'Barbell'] as const;
     const isValid = localProfile.equipment.length > 0;
 
     const toggleEq = (eq: any) => {
