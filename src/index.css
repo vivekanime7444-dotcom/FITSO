@@ -44,24 +44,29 @@
 }
 
 html, body {
-  min-height: 100vh;
+  height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
+  overflow: hidden; /* Prevent scrolling outside the app wrapper */
   background-color: #000;
   color: var(--text-primary);
   font-family: var(--font-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  user-select: none;
 }
 
 #root {
   width: 100%;
-  max-width: 430px;
-  min-height: 100vh;
-  margin: 0 auto;
+  max-width: 430px; /* Mobile width */
+  height: 100dvh;
   position: relative;
-  display: block;
+  display: flex;
+  flex-direction: column;
   background-color: #030814;
   background-image: url('/sl_background_texture.jpg');
   background-size: cover;
