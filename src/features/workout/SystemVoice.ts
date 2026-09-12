@@ -10,14 +10,23 @@ export class SystemVoice {
       const voices = this.synth.getVoices();
       if (voices.length === 0) return;
 
-      // Prioritize English Male voices that sound natural/deep
-      const enMaleVoices = voices.filter(v => v.lang.startsWith('en') && (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('mark') || v.name.toLowerCase().includes('guy')));
+      const maleKeywords = ['male', 'david', 'mark', 'guy', 'daniel', 'arthur', 'gordon', 'aaron', 'fred', 'ralph', 'bruce', 'alex', 'oliver', 'james', 'william', 'george', 'ryan', 'martin', 'brian', 'edward', 'reed', 'rocko'];
+      const femaleKeywords = ['female', 'samantha', 'karen', 'victoria', 'moira', 'tessa', 'siri', 'amelia', 'fiona', 'marie', 'kathy', 'agnes', 'zara', 'grace', 'nicola', 'catherine', 'martha', 'luciana', 'monica', 'paulina', 'melina', 'flo', 'grandma'];
+
+      const isMale = (v: SpeechSynthesisVoice) => maleKeywords.some(k => v.name.toLowerCase().includes(k));
+      const isFemale = (v: SpeechSynthesisVoice) => femaleKeywords.some(k => v.name.toLowerCase().includes(k));
+
       const enVoices = voices.filter(v => v.lang.startsWith('en'));
+      const enMaleVoices = enVoices.filter(isMale);
+      const enNeutralVoices = enVoices.filter(v => !isMale(v) && !isFemale(v));
       
-      // Preferred deep voices if available (Google UK English Male, Microsoft David, etc.)
+      // Preferred deep voices if available
       const preferred = enMaleVoices.find(v => v.name.includes('UK English Male')) || 
                         enMaleVoices.find(v => v.name.includes('David')) ||
+                        enMaleVoices.find(v => v.name.includes('Daniel')) ||
+                        enMaleVoices.find(v => v.name.includes('Arthur')) ||
                         enMaleVoices[0] ||
+                        enNeutralVoices[0] ||
                         enVoices[0] ||
                         voices[0];
                         
