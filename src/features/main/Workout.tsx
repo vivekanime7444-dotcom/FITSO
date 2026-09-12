@@ -6,10 +6,9 @@ import type { WorkoutSession } from '../../store/useWorkoutStore';
 import { generateWorkout } from '../workout/workoutGenerator';
 import { generateWeeklySplit } from '../workout/splitGenerator';
 import { getExerciseById } from '../workout/exerciseDatabase';
-import { SystemVoice } from '../workout/SystemVoice';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
-import { Play, Check, Timer, ChevronRight, Volume2, VolumeX, ShieldAlert, Zap, ZapOff } from 'lucide-react';
+import { Play, Check, Timer, ChevronRight, ShieldAlert, Zap, ZapOff } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
@@ -20,8 +19,6 @@ export const Workout: React.FC = () => {
     updateActiveSet, 
     completeActiveWorkout, 
     cancelActiveWorkout,
-    voiceEnabled,
-    setVoiceEnabled,
     soundsEnabled,
     setSoundsEnabled,
     workoutHistory,
@@ -36,7 +33,6 @@ export const Workout: React.FC = () => {
   
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [isResting, setIsResting] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false); 
 
   useEffect(() => {
     SoundEffectService.setEnabled(soundsEnabled);
@@ -55,38 +51,6 @@ export const Workout: React.FC = () => {
       setProposedWorkout(generated); 
     }
   }, [profile, activeWorkout, proposedWorkout, weeklyPlan]);
-
-  const playVoice = (text: string) => {
-    if (voiceEnabled) {
-      setIsSpeaking(true);
-      SystemVoice.speak(text, voiceEnabled);
-      // Rough approximation for UI animation duration
-      setTimeout(() => setIsSpeaking(false), 3000); 
-    }
-  };
-
-  const playNextSetVoice = () => {
-    if (!activeWorkout) return;
-    const currentEx = activeWorkout.exercises[currentExerciseIndex];
-    const def = getExerciseById(currentEx.exerciseId);
-    const currentSet = currentEx.sets[currentSetIndex];
-    
-    if (def && currentSet) {
-      const type = def.movementType === 'repetition' ? 'reps' : 'time';
-      const amount = type === 'reps' ? currentSet.targetReps || 0 : currentSet.targetDuration || 0;
-
-      if (currentSetIndex === 0) {
-        // Announce exercise, then set
-        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(currentExerciseIndex + 1, def.voiceName)));
-        setTimeout(() => {
-          playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(currentSetIndex + 1, type, amount)));
-        }, 3000);
-      } else {
-        // Just announce set
-        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(currentSetIndex + 1, type, amount)));
-      }
-    }
-  };
 
   useEffect(() => {
     let interval: any = null;
@@ -109,17 +73,9 @@ export const Workout: React.FC = () => {
       // Rest Complete Sequence
       HapticService.confirm();
       SoundEffectService.playNotification();
-      
-      setTimeout(() => {
-        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.restComplete()));
-        
-        setTimeout(() => {
-          playNextSetVoice();
-        }, 2500);
-      }, 500); // Wait for sound effect to finish
     }
     return () => clearInterval(interval);
-  }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex, voiceEnabled]);
+  }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex]);
 
 
   if (!profile.isCompleted) {
@@ -147,9 +103,6 @@ export const Workout: React.FC = () => {
           <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '16px' }}>
             <button onClick={() => setSoundsEnabled(!soundsEnabled)} style={{ background: 'none', border: 'none', color: soundsEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
               {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
-            </button>
-            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{ background: 'none', border: 'none', color: voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
-              {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </button>
           </div>
 
@@ -187,7 +140,6 @@ export const Workout: React.FC = () => {
   const handleStartWorkout = () => {
     // 1. Initialize Audio/Voice Context on intentional user interaction
     SoundEffectService.init();
-    SystemVoice.init();
     
     // 2. Play Haptic and Button Sound
     HapticService.light();
@@ -199,32 +151,6 @@ export const Workout: React.FC = () => {
     setViewState('active');
     setCurrentExerciseIndex(0);
     setCurrentSetIndex(0);
-
-    // 3. Play Voice (wait a bit for sound effect)
-    setTimeout(() => {
-      const protocolName = activeWorkout ? activeWorkout.workoutName : proposedWorkout?.workoutName;
-      playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startWorkout(protocolName || 'Protocol')));
-      
-      setTimeout(() => {
-        const firstExId = (activeWorkout || proposedWorkout)?.exercises[0]?.exerciseId;
-        if (firstExId) {
-          const def = getExerciseById(firstExId);
-          if (def) {
-            playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(1, def.voiceName)));
-            
-            setTimeout(() => {
-              const currentEx = (activeWorkout || proposedWorkout)?.exercises[0];
-              const firstSet = currentEx?.sets[0];
-              if (firstSet) {
-                 const type = def.movementType === 'repetition' ? 'reps' : 'time';
-                 const amount = type === 'reps' ? firstSet.targetReps || 0 : firstSet.targetDuration || 0;
-                 playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(1, type, amount)));
-              }
-            }, 3500);
-          }
-        }
-      }, 4000);
-    }, 800);
   };
 
   const handleCompleteSet = () => {
@@ -245,7 +171,6 @@ export const Workout: React.FC = () => {
         completeActiveWorkout();
         setViewState('summary');
         SoundEffectService.playMissionComplete();
-        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.workoutComplete())), 800);
       } else if (isLastSet) {
         const exDef = getExerciseById(currentEx.exerciseId);
         setRestTimeLeft(exDef?.defaultRest || 60);
@@ -255,7 +180,6 @@ export const Workout: React.FC = () => {
         setCurrentSetIndex(0);
         
         SoundEffectService.playNotification();
-        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.setComplete())), 500);
       } else {
         const exDef = getExerciseById(currentEx.exerciseId);
         setRestTimeLeft(exDef?.defaultRest || 60);
@@ -264,7 +188,6 @@ export const Workout: React.FC = () => {
         setCurrentSetIndex(prev => prev + 1);
         
         SoundEffectService.playNotification();
-        setTimeout(() => playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.setComplete())), 500);
       }
     }, 400); // Delay UI transition slightly after click sound
   };
@@ -275,8 +198,6 @@ export const Workout: React.FC = () => {
     setIsResting(false);
     setRestTimeLeft(0);
     setViewState('active');
-    SystemVoice.cancel();
-    playNextSetVoice();
   };
 
   const getPreviousPerformance = (exerciseId: string) => {
@@ -307,21 +228,6 @@ export const Workout: React.FC = () => {
       >
         {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
       </button>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: isSpeaking ? 'var(--accent-cyan)' : (voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)') }}>
-        {isSpeaking && <span className={styles.labelDim} style={{ color: 'var(--accent-cyan)' }}>SYSTEM</span>}
-        <button 
-          onClick={() => {
-            HapticService.selection();
-            SoundEffectService.playClick();
-            setVoiceEnabled(!voiceEnabled);
-            if (voiceEnabled) SystemVoice.cancel();
-          }}
-          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
-        >
-          {voiceEnabled ? <Volume2 size={20} className={isSpeaking ? 'pulse-anim' : ''} /> : <VolumeX size={20} />}
-        </button>
-      </div>
     </div>
   );
 
