@@ -65,6 +65,29 @@ export const Workout: React.FC = () => {
     }
   };
 
+  const playNextSetVoice = () => {
+    if (!activeWorkout) return;
+    const currentEx = activeWorkout.exercises[currentExerciseIndex];
+    const def = getExerciseById(currentEx.exerciseId);
+    const currentSet = currentEx.sets[currentSetIndex];
+    
+    if (def && currentSet) {
+      const type = def.movementType === 'repetition' ? 'reps' : 'time';
+      const amount = type === 'reps' ? currentSet.targetReps || 0 : currentSet.targetDuration || 0;
+
+      if (currentSetIndex === 0) {
+        // Announce exercise, then set
+        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(currentExerciseIndex + 1, def.voiceName)));
+        setTimeout(() => {
+          playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(currentSetIndex + 1, type, amount)));
+        }, 3000);
+      } else {
+        // Just announce set
+        playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startSet(currentSetIndex + 1, type, amount)));
+      }
+    }
+  };
+
   useEffect(() => {
     let interval: any = null;
     if (isResting && restTimeLeft > 0) {
@@ -90,20 +113,13 @@ export const Workout: React.FC = () => {
       setTimeout(() => {
         playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.restComplete()));
         
-        // Announce next exercise if starting a new one
-        if (activeWorkout && currentSetIndex === 0) {
-          const currentEx = activeWorkout.exercises[currentExerciseIndex];
-          const def = getExerciseById(currentEx.exerciseId);
-          if (def) {
-            setTimeout(() => {
-              playVoice(SystemVoice.getRandomPhrase(SystemVoice.getPhrases.startExercise(currentExerciseIndex + 1, def.voiceName)));
-            }, 3000);
-          }
-        }
+        setTimeout(() => {
+          playNextSetVoice();
+        }, 2500);
       }, 500); // Wait for sound effect to finish
     }
     return () => clearInterval(interval);
-  }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex]);
+  }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex, voiceEnabled]);
 
 
   if (!profile.isCompleted) {
@@ -259,6 +275,8 @@ export const Workout: React.FC = () => {
     setIsResting(false);
     setRestTimeLeft(0);
     setViewState('active');
+    SystemVoice.cancel();
+    playNextSetVoice();
   };
 
   const getPreviousPerformance = (exerciseId: string) => {
