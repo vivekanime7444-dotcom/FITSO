@@ -1,6 +1,5 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useProfileStore } from './store/useProfileStore';
 import { MainLayout } from './components/layout/MainLayout';
 import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
 import { Home } from './features/main/Home';
@@ -9,8 +8,6 @@ import { Progress } from './features/main/Progress';
 import { Profile } from './features/main/Profile';
 
 const App: React.FC = () => {
-  const isCompleted = useProfileStore((state) => state.profile.isCompleted);
-
   return (
     <BrowserRouter>
       <Routes>

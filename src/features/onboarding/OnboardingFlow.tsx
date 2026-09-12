@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SelectableCard } from '../../components/ui/SelectableCard';
 import { Card } from '../../components/ui/Card';
-import { ChevronRight, ChevronLeft, Zap, Target, Dumbbell, Calendar, Clock, User } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Zap, Target, Dumbbell, Calendar, User } from 'lucide-react';
 import styles from './Onboarding.module.css';
 
 const STEPS = {
