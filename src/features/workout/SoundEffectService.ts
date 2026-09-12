@@ -1,21 +1,20 @@
 export class SoundEffectService {
   private static ctx: AudioContext | null = null;
   private static enabled = true;
-  private static navAudio: HTMLAudioElement | null = null;
 
   public static init() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
-    if (!this.navAudio) {
-      this.navAudio = new Audio('/nav-click.aac');
-    }
   }
 
+  // Soft, futuristic sci-fi selection blip
   public static playNavClick() {
-    if (!this.enabled || !this.navAudio) return;
-    this.navAudio.currentTime = 0;
-    this.navAudio.play().catch(() => {});
+    if (!this.enabled || !this.ctx) return;
+    
+    // Very quick high-tech blip (mix of high freq sine and rapid decay)
+    this.playTone(1800, 'sine', 0.02, 0.03);
+    setTimeout(() => this.playTone(2400, 'sine', 0.03, 0.02), 20);
   }
 
   public static setEnabled(enabled: boolean) {
