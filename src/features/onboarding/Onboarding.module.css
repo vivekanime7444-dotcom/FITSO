@@ -1,0 +1,200 @@
+.onboardingLayout {
+  height: 100%;
+  width: 100%;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.progressBar {
+  height: 4px;
+  background: var(--bg-surface-elevated);
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 10px var(--accent-cyan);
+  transition: width 0.3s ease;
+}
+
+.stepWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+}
+
+.stepContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
+  border: var(--border-thin);
+  padding: var(--spacing-lg);
+  margin-top: 40px;
+}
+
+.stepContainer::before,
+.stepContainer::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-color: var(--accent-cyan);
+  border-style: solid;
+}
+
+.stepContainer::before {
+  top: -2px;
+  left: -2px;
+  border-width: 2px 0 0 2px;
+}
+
+.stepContainer::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 2px 2px 0;
+}
+
+.centerContent {
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.systemMessage {
+  font-family: var(--font-system);
+  color: var(--text-secondary);
+  letter-spacing: 2px;
+  font-size: 0.9rem;
+  animation: pulseGlow 3s infinite;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+  margin-top: var(--spacing-lg);
+}
+
+.headerIcon {
+  color: var(--accent-cyan);
+}
+
+.formGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  flex: 1;
+}
+
+.cardsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-md);
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 20px;
+}
+
+@media (min-width: 400px) {
+  .cardsGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.sectionTitle {
+  font-family: var(--font-system);
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 1px;
+}
+
+.daysGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.dayCircle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: var(--border-thin);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-system);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--bg-surface-elevated);
+}
+
+.dayActive {
+  background: rgba(0, 240, 255, 0.1);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.customTimeWrapper {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-md);
+  background: var(--bg-surface-elevated);
+  border-radius: 8px;
+  border: var(--border-thin);
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) 0;
+  margin-top: auto;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.summarySection h3 {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xs);
+}
+
+.summarySection p {
+  font-size: 1rem;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.highlight {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}

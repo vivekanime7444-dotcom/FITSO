@@ -1,0 +1,278 @@
+.screenContainer {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+/* Outer Frame with Corner Brackets */
+.systemOuterFrame {
+  width: 100%;
+  max-width: 400px;
+  border: var(--border-thin);
+  padding: var(--spacing-lg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  margin-top: 20px;
+}
+
+.systemOuterFrame::before,
+.systemOuterFrame::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-color: var(--accent-cyan);
+  border-style: solid;
+}
+
+.systemOuterFrame::before {
+  top: -2px;
+  left: -2px;
+  border-width: 2px 0 0 2px;
+}
+
+.systemOuterFrame::after {
+  bottom: -2px;
+  right: -2px;
+  border-width: 0 2px 2px 0;
+}
+
+/* Status Title */
+.statusTitleBox {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #030814;
+  border: var(--border-thin);
+  padding: 4px 40px;
+  font-family: var(--font-system);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: var(--text-primary);
+  text-shadow: var(--system-glow-subtle);
+  box-shadow: 0 0 10px rgba(0,0,0,0.8);
+}
+
+/* Level Section */
+.levelInfoSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-xl);
+  margin-top: var(--spacing-lg);
+}
+
+.levelBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.levelNumber {
+  font-size: 4rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-primary);
+  text-shadow: 0 0 20px rgba(153, 235, 255, 0.8), 0 0 10px rgba(153, 235, 255, 0.5);
+}
+
+.levelLabel {
+  font-family: var(--font-system);
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+}
+
+.jobBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--font-base);
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  text-shadow: var(--system-glow-subtle);
+  border-left: 1px solid rgba(153, 235, 255, 0.2);
+  padding-left: var(--spacing-lg);
+}
+
+.labelDim {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-right: 4px;
+  text-shadow: none;
+}
+
+/* Vitals Section */
+.vitalsSection {
+  border: var(--border-thin);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vitalBars {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  flex: 1;
+  border-right: 1px solid rgba(153, 235, 255, 0.2);
+  padding-right: var(--spacing-md);
+  margin-right: var(--spacing-md);
+}
+
+.vitalBarRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vitalIcon {
+  color: var(--text-primary);
+  filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+}
+
+.barLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  width: 25px;
+}
+
+.barTrack {
+  flex: 1;
+  height: 10px;
+  border: 1px solid rgba(153, 235, 255, 0.5);
+  border-radius: 10px;
+  padding: 1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--text-primary);
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(255,255,255,0.8);
+}
+
+.barText {
+  position: absolute;
+  right: 0;
+  bottom: -16px;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.fatigueBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.fatigueIcon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px dashed rgba(153, 235, 255, 0.5);
+  animation: spin 10s linear infinite;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+.fatigueLabel {
+  font-family: var(--font-system);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+/* Stats Section */
+.statsSection {
+  border: var(--border-thin);
+  padding: var(--spacing-lg);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  row-gap: var(--spacing-lg);
+  column-gap: var(--spacing-md);
+}
+
+.statItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statIcon {
+  color: var(--accent-cyan);
+  filter: drop-shadow(0 0 5px rgba(153, 235, 255, 0.5));
+}
+
+.statName {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+}
+
+.statValue {
+  color: var(--text-primary);
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-shadow: var(--system-glow-subtle);
+  margin-left: auto;
+}
+
+.apItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: var(--spacing-md);
+}
+
+.apLabel {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-align: right;
+  line-height: 1.2;
+}
+
+.apValue {
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 700;
+  text-shadow: var(--system-glow-subtle);
+}
+
+/* Utilities for other screens */
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.emptyIcon {
+  color: rgba(255, 255, 255, 0.1);
+  margin-bottom: var(--spacing-md);
+}
+
+.panelText {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}

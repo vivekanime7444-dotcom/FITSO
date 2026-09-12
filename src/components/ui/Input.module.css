@@ -1,0 +1,71 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 100%;
+}
+
+.label {
+  font-family: var(--font-system);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.inputWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input {
+  width: 100%;
+  background: transparent;
+  border: var(--border-thin);
+  border-radius: 0;
+  padding: 0 var(--spacing-md);
+  height: 48px;
+  color: var(--text-primary);
+  font-family: var(--font-base);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(153, 235, 255, 0.2) inset;
+  background: rgba(3, 8, 20, 0.9);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.hasSuffix {
+  padding-right: 48px;
+}
+
+.suffix {
+  position: absolute;
+  right: var(--spacing-md);
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+.inputError {
+  border-color: #ff3333;
+}
+
+.inputError:focus {
+  border-color: #ff3333;
+  box-shadow: 0 0 10px rgba(255, 51, 51, 0.1);
+}
+
+.errorText {
+  color: #ff3333;
+  font-size: 0.8rem;
+  margin-top: 2px;
+}

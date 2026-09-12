@@ -1,0 +1,12 @@
+.card {
+  background: transparent;
+  border: var(--glass-border);
+  border-radius: 0px;
+  padding: var(--spacing-lg);
+  position: relative;
+}
+
+.glow {
+  box-shadow: none;
+  border: var(--border-accent);
+}

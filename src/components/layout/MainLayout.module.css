@@ -1,0 +1,13 @@
+.layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: transparent;
+}
+
+.mainContent {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
