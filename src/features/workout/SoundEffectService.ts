@@ -1,11 +1,21 @@
 export class SoundEffectService {
   private static ctx: AudioContext | null = null;
   private static enabled = true;
+  private static navAudio: HTMLAudioElement | null = null;
 
   public static init() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
+    if (!this.navAudio) {
+      this.navAudio = new Audio('/nav-click.aac');
+    }
+  }
+
+  public static playNavClick() {
+    if (!this.enabled || !this.navAudio) return;
+    this.navAudio.currentTime = 0;
+    this.navAudio.play().catch(() => {});
   }
 
   public static setEnabled(enabled: boolean) {

@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SelectableCard } from '../../components/ui/SelectableCard';
 import { Card } from '../../components/ui/Card';
+import { SoundEffectService } from '../workout/SoundEffectService';
+import { HapticService } from '../workout/HapticService';
 import { ChevronRight, ChevronLeft, Zap, Target, Dumbbell, Calendar, User } from 'lucide-react';
 import styles from './Onboarding.module.css';
 
@@ -27,8 +29,17 @@ export const OnboardingFlow: React.FC = () => {
   // Local state to hold profile edits before confirming
   const [localProfile, setLocalProfile] = useState<UserProfile>(storeProfile);
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, STEPS.CONFIRMATION));
-  const prevStep = () => setStep((s) => Math.max(s - 1, STEPS.INTRO));
+  const nextStep = () => {
+    SoundEffectService.playNavClick();
+    HapticService.selection();
+    setStep((s) => Math.min(s + 1, STEPS.CONFIRMATION));
+  };
+  
+  const prevStep = () => {
+    SoundEffectService.playNavClick();
+    HapticService.selection();
+    setStep((s) => Math.max(s - 1, STEPS.INTRO));
+  };
 
   const updateLocal = (updates: Partial<UserProfile>) => {
     setLocalProfile((prev) => ({ ...prev, ...updates }));
