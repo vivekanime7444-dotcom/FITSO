@@ -29,6 +29,8 @@
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .stepContainer {
@@ -38,10 +40,9 @@
   position: relative;
   width: 100%;
   max-width: 400px;
-  margin: 0 auto;
+  margin: 40px auto 40px auto;
   border: var(--border-thin);
   padding: var(--spacing-lg);
-  margin-top: 40px;
 }
 
 .stepContainer::before,
