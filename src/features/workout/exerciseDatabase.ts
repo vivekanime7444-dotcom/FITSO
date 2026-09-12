@@ -1,4 +1,4 @@
-import { ExerciseDef } from '../../store/useWorkoutStore';
+import type { ExerciseDef } from '../../store/useWorkoutStore';
 
 export const EXERCISE_DATABASE: ExerciseDef[] = [
   // BODYWEIGHT - CHEST / TRICEPS

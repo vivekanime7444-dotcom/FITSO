@@ -25,7 +25,7 @@ export const Progress: React.FC = () => {
           </div>
         ) : (
           <div style={{ marginTop: '24px' }}>
-            {workoutHistory.map((workout, index) => (
+            {workoutHistory.map((workout) => (
               <div key={workout.id} style={{
                 backgroundColor: 'rgba(15, 23, 42, 0.6)',
                 border: 'var(--border-thin)',

@@ -1,5 +1,5 @@
-import { UserProfile, Equipment } from '../../store/useProfileStore';
-import { WorkoutSession, WorkoutExercise, ExerciseDef } from '../../store/useWorkoutStore';
+import type { UserProfile, Equipment } from '../../store/useProfileStore';
+import type { WorkoutSession, WorkoutExercise, ExerciseDef } from '../../store/useWorkoutStore';
 import { EXERCISE_DATABASE } from './exerciseDatabase';
 
 // Helper to check if user has required equipment
@@ -34,7 +34,6 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
   // 2. Determine Workout Structure based on Goal and Level
   let workoutName = 'GENERAL PROTOCOL';
   let targetExercises = 5;
-  let focusGroups: string[] = [];
 
   switch (profile.primaryGoal) {
     case 'Build Muscle':
@@ -48,7 +47,6 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
     case 'Improve Endurance':
       workoutName = 'ENDURANCE PROTOCOL';
       targetExercises = 6;
-      focusGroups = ['Conditioning', 'Legs', 'Core'];
       break;
     default:
       workoutName = 'SYSTEM TRAINING';
@@ -84,15 +82,12 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
     // Adjust sets/reps based on goals (Simplified)
     let sets = def.defaultSets;
     let reps = def.defaultReps;
-    let rest = def.defaultRest;
 
     if (profile.primaryGoal === 'Build Strength' && def.movementType === 'repetition') {
       sets = def.defaultSets + 1;
       reps = Math.max(5, def.defaultReps - 4);
-      rest = 120;
     } else if (profile.primaryGoal === 'Improve Endurance' && def.movementType === 'repetition') {
       reps = def.defaultReps + 5;
-      rest = 45;
     }
 
     const generatedSets = Array(sets).fill(null).map((_, i) => ({

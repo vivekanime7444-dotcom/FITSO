@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
-import { useWorkoutStore, WorkoutSession } from '../../store/useWorkoutStore';
+import { useWorkoutStore } from '../../store/useWorkoutStore';
+import type { WorkoutSession } from '../../store/useWorkoutStore';
 import { generateWorkout } from '../workout/workoutGenerator';
 import { getExerciseById } from '../workout/exerciseDatabase';
-import { Play, Check, X, Timer, ChevronRight } from 'lucide-react';
+import { Play, Check, Timer, ChevronRight } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
