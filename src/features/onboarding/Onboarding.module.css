@@ -112,11 +112,7 @@
   flex: 1;
 }
 
-@media (min-width: 400px) {
-  .cardsGrid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
+
 
 .sectionTitle {
   font-family: var(--font-system);

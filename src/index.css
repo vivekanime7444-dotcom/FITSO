@@ -49,19 +49,16 @@ html, body {
   font-family: var(--font-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  height: 100%;
+  min-height: 100%;
   width: 100%;
-  overflow: hidden; /* Prevent scrolling outside the app wrapper */
   user-select: none;
-  display: flex;
-  justify-content: center;
-  align-items: center;
 }
 
 #root {
   width: 100%;
   max-width: 430px; /* Mobile width */
   min-height: 100vh;
+  margin: 0 auto;
   position: relative;
   display: flex;
   flex-direction: column;
