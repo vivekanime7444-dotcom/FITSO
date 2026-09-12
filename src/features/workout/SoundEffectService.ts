@@ -10,7 +10,8 @@ export class SoundEffectService {
 
   // Soft, futuristic sci-fi selection blip
   public static playNavClick() {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
+    if (!this.ctx) this.init();
     
     // Very quick high-tech blip (mix of high freq sine and rapid decay)
     this.playTone(1800, 'sine', 0.02, 0.03);
@@ -22,7 +23,9 @@ export class SoundEffectService {
   }
 
   private static playTone(frequency: number, type: OscillatorType, duration: number, vol = 0.1) {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
+    if (!this.ctx) this.init();
+    if (!this.ctx) return;
     
     // Resume context if suspended (common browser policy)
     if (this.ctx.state === 'suspended') {
@@ -59,21 +62,21 @@ export class SoundEffectService {
 
   // Set Complete confirmation
   public static playConfirm() {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
     this.playTone(600, 'sine', 0.1, 0.1);
     setTimeout(() => this.playTone(900, 'sine', 0.15, 0.1), 100);
   }
 
   // System Notification (Before voice speaks)
   public static playNotification() {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
     this.playTone(1200, 'triangle', 0.1, 0.05);
     setTimeout(() => this.playTone(1600, 'triangle', 0.2, 0.05), 100);
   }
 
   // Mission Start
   public static playMissionStart() {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
     this.playTone(300, 'square', 0.2, 0.1);
     setTimeout(() => this.playTone(400, 'square', 0.2, 0.1), 150);
     setTimeout(() => this.playTone(600, 'square', 0.4, 0.1), 300);
@@ -81,7 +84,7 @@ export class SoundEffectService {
 
   // Mission Complete
   public static playMissionComplete() {
-    if (!this.enabled || !this.ctx) return;
+    if (!this.enabled) return;
     this.playTone(800, 'sine', 0.2, 0.1);
     setTimeout(() => this.playTone(1200, 'sine', 0.2, 0.1), 200);
     setTimeout(() => this.playTone(1600, 'sine', 0.6, 0.1), 400);
