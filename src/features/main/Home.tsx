@@ -27,22 +27,23 @@ export const Home: React.FC = () => {
           </div>
         </div>
 
-        {/* System Progress (Replaces Vitals) */}
+        {/* Mission Status (Replaces Vitals) */}
         <div className={styles.vitalsSection}>
           <div className={styles.vitalBars}>
             <div className={styles.vitalBarRow}>
               <Activity size={18} className={styles.vitalIcon} />
-              <div className={styles.barLabel} style={{width: 'auto', marginRight: '8px'}}>EXP</div>
-              <div className={styles.barTrack}>
-                <div className={styles.barFill} style={{ width: '0%' }}></div>
-                <div className={styles.barText}>0/100</div>
+              <div className={styles.barLabel} style={{width: 'auto', marginRight: '8px'}}>MISSION</div>
+              <div className={styles.barTrack} style={{ backgroundColor: 'rgba(0,0,0,0.5)', border: 'none' }}>
+                <div style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-system)', letterSpacing: '1px' }}>
+                  {profile.trainingDaysCount ? 'STANDBY' : 'AWAITING DIRECTIVE'}
+                </div>
               </div>
             </div>
           </div>
           
           <div className={styles.fatigueBlock}>
             <div className={styles.fatigueIcon}></div>
-            <div className={styles.fatigueLabel}>STREAK: <span style={{color: 'var(--text-primary)'}}>0</span></div>
+            <div className={styles.fatigueLabel}>STREAK: <span style={{color: 'var(--text-primary)'}}>1</span></div>
           </div>
         </div>
 
