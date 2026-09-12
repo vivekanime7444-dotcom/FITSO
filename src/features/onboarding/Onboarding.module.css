@@ -1,12 +1,10 @@
 .onboardingLayout {
   flex: 1;
-  min-height: 0;
   width: 100%;
   background: transparent;
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden;
 }
 
 .progressBar {
@@ -28,13 +26,9 @@
 
 .stepWrapper {
   flex: 1;
-  min-height: 0; /* CRUCIAL: allows flex child to shrink and trigger overflow scroll */
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
 }
 
 .stepContainer {
@@ -43,11 +37,10 @@
   position: relative;
   width: 100%;
   max-width: 400px;
-  margin: auto; /* Centers the box */
-  height: 90%; /* Fixed height relative to screen */
-  max-height: 800px;
+  margin: 40px auto 40px auto;
   border: var(--border-thin);
   padding: var(--spacing-lg);
+  min-height: calc(100vh - 80px); /* Fill most of the screen natively */
 }
 
 .stepContainer::before,
@@ -103,9 +96,6 @@
   flex-direction: column;
   gap: var(--spacing-lg);
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
 }
 
 .cardsList {
@@ -113,10 +103,6 @@
   flex-direction: column;
   gap: var(--spacing-md);
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-  padding-bottom: 20px;
 }
 
 .cardsGrid {
@@ -124,10 +110,6 @@
   grid-template-columns: 1fr;
   gap: var(--spacing-md);
   flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-right: 4px;
-  padding-bottom: 20px;
 }
 
 @media (min-width: 400px) {

@@ -61,7 +61,7 @@ html, body {
 #root {
   width: 100%;
   max-width: 430px; /* Mobile width */
-  height: 100dvh;
+  min-height: 100vh;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -70,7 +70,6 @@ html, body {
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  overflow: hidden;
   box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
   border-left: var(--border-thin);
   border-right: var(--border-thin);
