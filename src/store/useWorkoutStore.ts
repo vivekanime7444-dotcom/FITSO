@@ -38,6 +38,7 @@ export interface WorkoutExercise {
 export interface WorkoutSession {
   id: string;
   workoutName: string;
+  targetMuscles: string[]; // NEW
   date: string; // ISO string
   startTime: number; // timestamp
   endTime?: number; // timestamp
@@ -46,11 +47,22 @@ export interface WorkoutSession {
   completed: boolean;
 }
 
+export interface TrainingDayPlan {
+  dayOfWeek: string;
+  protocolName: string;
+  isRestDay: boolean;
+  targetMuscles: string[];
+}
+
 interface WorkoutState {
   workoutHistory: WorkoutSession[];
   activeWorkout: WorkoutSession | null;
+  voiceEnabled: boolean; // NEW
+  weeklyPlan: TrainingDayPlan[]; // NEW
   
   // Actions
+  setVoiceEnabled: (enabled: boolean) => void;
+  setWeeklyPlan: (plan: TrainingDayPlan[]) => void;
   startWorkout: (session: WorkoutSession) => void;
   updateActiveSet: (exerciseIndex: number, setIndex: number, data: Partial<WorkoutSet>) => void;
   completeActiveWorkout: () => void;
@@ -63,6 +75,11 @@ export const useWorkoutStore = create<WorkoutState>()(
     (set) => ({
       workoutHistory: [],
       activeWorkout: null,
+      voiceEnabled: true,
+      weeklyPlan: [],
+
+      setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
+      setWeeklyPlan: (plan) => set({ weeklyPlan: plan }),
 
       startWorkout: (session) => set({ activeWorkout: session }),
 

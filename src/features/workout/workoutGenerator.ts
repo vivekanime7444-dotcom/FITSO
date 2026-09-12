@@ -1,17 +1,13 @@
-import type { UserProfile, Equipment } from '../../store/useProfileStore';
+import type { UserProfile, Equipment, DayOfWeek } from '../../store/useProfileStore';
 import type { WorkoutSession, WorkoutExercise, ExerciseDef } from '../../store/useWorkoutStore';
 import { EXERCISE_DATABASE } from './exerciseDatabase';
+import { generateWeeklySplit } from './splitGenerator';
 
 // Helper to check if user has required equipment
 const hasRequiredEquipment = (userEquip: Equipment[], requiredEquip: string[]): boolean => {
   if (requiredEquip.length === 0 || requiredEquip.includes('No Equipment')) {
     return true;
   }
-  
-  // If an exercise requires multiple pieces of equipment (e.g. ['Dumbbells', 'Bench']),
-  // the user must have ALL of them. Or we can just say "at least one primary".
-  // Let's enforce strict: User must have all required equipment.
-  // Exception: 'Bench' can sometimes be skipped for floor press, but we've separated those.
   return requiredEquip.every(eq => userEquip.includes(eq as Equipment));
 };
 
@@ -24,60 +20,52 @@ const getRandomItems = <T>(array: T[], count: number): T[] => {
 export const generateWorkout = (profile: UserProfile): WorkoutSession | null => {
   if (!profile.isCompleted) return null;
 
-  // 1. Filter database by available equipment
+  // 1. Determine today's day of week
+  const days: DayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const todayStr = days[new Date().getDay()];
+
+  // 2. Generate the weekly plan to find today's protocol
+  const weeklyPlan = generateWeeklySplit(profile);
+  const todayPlan = weeklyPlan.find(p => p.dayOfWeek === todayStr);
+
+  if (!todayPlan || todayPlan.isRestDay) {
+    return null; // The UI handles Rest Days separately
+  }
+
+  // 3. Filter database by available equipment AND target muscles for today's protocol
   const availableExercises = EXERCISE_DATABASE.filter(ex => 
-    hasRequiredEquipment(profile.equipment, ex.equipmentRequired)
+    hasRequiredEquipment(profile.equipment, ex.equipmentRequired) &&
+    (todayPlan.targetMuscles.includes(ex.muscleGroup) || 
+     ex.secondaryMuscles.some(sm => todayPlan.targetMuscles.includes(sm)))
   );
 
   if (availableExercises.length === 0) return null;
 
-  // 2. Determine Workout Structure based on Goal and Level
-  let workoutName = 'GENERAL PROTOCOL';
+  // 4. Determine Workout Structure based on Goal and Level
   let targetExercises = 5;
+  if (profile.experienceLevel === 'Beginner') targetExercises = 4;
+  else if (profile.experienceLevel === 'Advanced') targetExercises = 6;
 
-  switch (profile.primaryGoal) {
-    case 'Build Muscle':
-      workoutName = 'HYPERTROPHY PROTOCOL';
-      targetExercises = profile.experienceLevel === 'Beginner' ? 4 : 6;
-      break;
-    case 'Build Strength':
-      workoutName = 'STRENGTH PROTOCOL';
-      targetExercises = profile.experienceLevel === 'Beginner' ? 4 : 5;
-      break;
-    case 'Improve Endurance':
-      workoutName = 'ENDURANCE PROTOCOL';
-      targetExercises = 6;
-      break;
-    default:
-      workoutName = 'SYSTEM TRAINING';
-      targetExercises = 5;
-  }
-
-  // Very basic "Full Body" split for now
-  // In a real system, we'd check what day of the week it is, but for Phase 2 we just generate a balanced session.
-  
   const selectedDefs: ExerciseDef[] = [];
   
-  // Try to get 1 Chest, 1 Back, 1 Leg, 1 Shoulder, 1 Core if possible
-  const categories = ['Chest', 'Back', 'Legs', 'Shoulders', 'Core', 'Conditioning'];
-  
-  for (const cat of categories) {
+  // Try to get at least one exercise for each target muscle
+  for (const muscle of todayPlan.targetMuscles) {
     if (selectedDefs.length >= targetExercises) break;
     
-    const candidates = availableExercises.filter(ex => ex.muscleGroup === cat);
+    const candidates = availableExercises.filter(ex => ex.muscleGroup === muscle && !selectedDefs.find(s => s.id === ex.id));
     if (candidates.length > 0) {
       selectedDefs.push(getRandomItems(candidates, 1)[0]);
     }
   }
 
-  // Fill remaining slots with random exercises
+  // Fill remaining slots
   while (selectedDefs.length < targetExercises) {
     const remaining = availableExercises.filter(ex => !selectedDefs.find(s => s.id === ex.id));
-    if (remaining.length === 0) break; // Exhausted available exercises
+    if (remaining.length === 0) break; 
     selectedDefs.push(getRandomItems(remaining, 1)[0]);
   }
 
-  // 3. Build WorkoutSession Object
+  // 5. Build WorkoutSession Object
   const exercises: WorkoutExercise[] = selectedDefs.map(def => {
     // Adjust sets/reps based on goals (Simplified)
     let sets = def.defaultSets;
@@ -105,7 +93,8 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
 
   return {
     id: `wk_${Date.now()}`,
-    workoutName,
+    workoutName: todayPlan.protocolName,
+    targetMuscles: todayPlan.targetMuscles,
     date: new Date().toISOString(),
     startTime: Date.now(),
     exercises,

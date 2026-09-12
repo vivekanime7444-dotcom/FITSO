@@ -1,5 +1,6 @@
 import React from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { User, Target, Calendar, Activity } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
@@ -35,7 +36,14 @@ export const Home: React.FC = () => {
               <div className={styles.barLabel} style={{width: 'auto', marginRight: '8px'}}>MISSION</div>
               <div className={styles.barTrack} style={{ backgroundColor: 'rgba(0,0,0,0.5)', border: 'none' }}>
                 <div style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-system)', letterSpacing: '1px' }}>
-                  {profile.trainingDaysCount ? 'STANDBY' : 'AWAITING DIRECTIVE'}
+                  {(() => {
+                    const { weeklyPlan } = useWorkoutStore.getState();
+                    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+                    const todayStr = days[new Date().getDay()];
+                    const todayPlan = weeklyPlan.find(p => p.dayOfWeek === todayStr);
+                    if (todayPlan) return todayPlan.protocolName.toUpperCase();
+                    return profile.trainingDaysCount ? 'STANDBY' : 'AWAITING DIRECTIVE';
+                  })()}
                 </div>
               </div>
             </div>
