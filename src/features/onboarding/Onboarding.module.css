@@ -1,10 +1,12 @@
 .onboardingLayout {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   background: transparent;
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
 
 .progressBar {
@@ -26,11 +28,13 @@
 
 .stepWrapper {
   flex: 1;
+  min-height: 0; /* CRUCIAL: allows flex child to shrink and trigger overflow scroll */
   display: flex;
   flex-direction: column;
   padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stepContainer {
