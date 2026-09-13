@@ -39,7 +39,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     } else if (provider === 'anthropic') {
       setModelName(localStorage.getItem('ANTHROPIC_MODEL_NAME') || 'claude-3-5-sonnet-20241022');
     } else if (provider === 'openrouter') {
-      setModelName(localStorage.getItem('OPENROUTER_MODEL_NAME') || 'meta-llama/llama-3.2-90b-vision-instruct');
+      setModelName(localStorage.getItem('OPENROUTER_MODEL_NAME') || 'openai/gpt-4o-mini');
     }
   };
 
