@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { NutritionService } from '../workout/NutritionService';
-import { X, Camera as CameraIcon, Loader2 } from 'lucide-react';
+import { NutritionService, type AIAnalysisResult } from '../workout/NutritionService';
+import { X, Camera as CameraIcon, Loader2, AlertTriangle, Bug } from 'lucide-react';
 import { HapticService } from '../workout/HapticService';
 
 interface CameraScannerProps {
@@ -11,7 +11,18 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [phase, setPhase] = useState<'IDLE' | 'ANALYZING' | 'IDENTIFYING' | 'ESTIMATING' | 'LOGGED'>('IDLE');
+  const [phase, setPhase] = useState<'IDLE' | 'ANALYZING' | 'REJECTED' | 'LOGGED' | 'ERROR'>('IDLE');
+  const [rejectionReason, setRejectionReason] = useState<string>('');
+  
+  // Diagnostics State
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<AIAnalysisResult['diagnostics'] | null>(null);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
+
+  const saveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem('GEMINI_API_KEY', key);
+  };
   
   useEffect(() => {
     // Start camera
@@ -41,6 +52,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     
     HapticService.selection();
     setPhase('ANALYZING');
+    setDiagnostics(null);
+    setRejectionReason('');
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -55,47 +68,93 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     
     // Compress image to base64
     const base64Image = canvas.toDataURL('image/jpeg', 0.7);
-
-    // UX Simulation Sequence
-    setTimeout(() => {
-      HapticService.light();
-      setPhase('IDENTIFYING');
-    }, 1000);
-    
-    setTimeout(() => {
-      HapticService.light();
-      setPhase('ESTIMATING');
-    }, 2000);
+    const scanId = 'scan_' + crypto.randomUUID().substring(0, 8);
 
     try {
-      const meal = await NutritionService.analyzeFoodImage(base64Image);
-      
-      setPhase('LOGGED');
-      NutritionService.logMeal(meal);
-      
-      setTimeout(() => {
-        onClose();
-      }, 1500);
+      const result = await NutritionService.analyzeFoodImage(base64Image, scanId);
+      setDiagnostics(result.diagnostics);
+
+      if (result.success && result.meal) {
+        setPhase('LOGGED');
+        NutritionService.logMeal(result.meal);
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      } else {
+        HapticService.error();
+        setPhase('REJECTED');
+        setRejectionReason(result.reason || 'NO FOOD DETECTED');
+      }
       
     } catch (e) {
       console.error(e);
-      alert("Analysis failed. Please try again.");
-      setPhase('IDLE');
+      HapticService.error();
+      setPhase('ERROR');
+      setRejectionReason('SCAN FAILED — PLEASE TRY AGAIN');
     }
+  };
+
+  const resetScanner = () => {
+    setPhase('IDLE');
+    setRejectionReason('');
   };
 
   return (
     <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: '#000', zIndex: 9999, display: 'flex', flexDirection: 'column' }}>
       
       {/* Header */}
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '24px', display: 'flex', justifyContent: 'space-between', zIndex: 2, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)' }}>
-        <div style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-system)', fontWeight: 'bold', fontSize: '1.2rem', textShadow: '0 0 10px var(--accent-cyan)' }}>
-          UNIVERSAL AI SCANNER
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '24px', display: 'flex', justifyContent: 'space-between', zIndex: 4, background: 'linear-gradient(to bottom, rgba(0,0,0,0.8), transparent)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ color: 'var(--accent-cyan)', fontFamily: 'var(--font-system)', fontWeight: 'bold', fontSize: '1.2rem', textShadow: '0 0 10px var(--accent-cyan)' }}>
+            UNIVERSAL AI SCANNER
+          </div>
+          <button onClick={() => setShowDiagnostics(!showDiagnostics)} style={{ background: 'none', border: '1px solid var(--text-dim)', color: 'var(--text-dim)', borderRadius: '4px', padding: '4px 8px', fontSize: '0.8rem', cursor: 'pointer' }}>
+            <Bug size={14} style={{ display: 'inline', marginRight: '4px' }}/> DIAGNOSTICS
+          </button>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
           <X size={28} />
         </button>
       </div>
+
+      {/* Diagnostics Panel Overlay */}
+      {showDiagnostics && (
+        <div style={{ position: 'absolute', top: '80px', left: '20px', right: '20px', bottom: '120px', background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', border: '1px solid var(--accent-cyan)', borderRadius: '12px', zIndex: 10, overflowY: 'auto', padding: '16px', fontFamily: 'monospace', fontSize: '0.85rem' }}>
+          <h3 style={{ color: 'var(--accent-cyan)', marginTop: 0 }}>DEVELOPER DIAGNOSTICS</h3>
+          
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>GEMINI API KEY:</div>
+            <input 
+              type="password" 
+              value={apiKey} 
+              onChange={(e) => saveApiKey(e.target.value)} 
+              placeholder="Paste API Key here..."
+              style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+            />
+          </div>
+
+          {diagnostics ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div><span style={{ color: 'var(--text-dim)' }}>Scan ID:</span> {diagnostics.scanId}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image captured:</span> YES</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image sent to API:</span> {diagnostics.imageSent ? 'YES' : 'NO'}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>API Error:</span> <span style={{ color: 'var(--accent-alert)' }}>{diagnostics.error || 'NONE'}</span></div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Food detected:</span> {diagnostics.foodDetected ? 'TRUE' : 'FALSE'}</div>
+              
+              {diagnostics.rawResponse && (
+                <div style={{ marginTop: '8px' }}>
+                  <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>Raw JSON Response:</div>
+                  <pre style={{ background: '#111', padding: '8px', borderRadius: '4px', overflowX: 'auto', color: 'var(--text-secondary)' }}>
+                    {JSON.stringify(diagnostics.rawResponse, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ color: 'var(--text-dim)' }}>No scan initiated yet.</div>
+          )}
+        </div>
+      )}
 
       {/* Viewfinder */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
@@ -118,19 +177,43 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
 
         {/* Phase Overlay */}
         {phase !== 'IDLE' && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--accent-cyan)', zIndex: 3 }}>
-            {phase === 'LOGGED' ? (
-              <div style={{ fontSize: '2rem', fontWeight: 'bold', textShadow: '0 0 20px var(--accent-cyan)' }}>
-                MEAL LOGGED
-              </div>
-            ) : (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', color: 'var(--accent-cyan)', zIndex: 3, padding: '24px', textAlign: 'center' }}>
+            
+            {phase === 'ANALYZING' && (
               <>
                 <Loader2 size={48} className="spin" style={{ marginBottom: '24px' }} />
-                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '2px' }}>
-                  {phase}...
+                <div style={{ fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'monospace', letterSpacing: '2px' }}>
+                  ANALYZING IMAGE...
                 </div>
               </>
             )}
+
+            {phase === 'LOGGED' && (
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', textShadow: '0 0 20px var(--accent-cyan)' }}>
+                MEAL LOGGED
+              </div>
+            )}
+
+            {(phase === 'REJECTED' || phase === 'ERROR') && (
+              <>
+                <AlertTriangle size={48} style={{ color: 'var(--accent-alert)', marginBottom: '16px' }} />
+                <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--accent-alert)', marginBottom: '12px' }}>
+                  {rejectionReason.toUpperCase()}
+                </div>
+                {phase === 'REJECTED' && (
+                  <div style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>
+                    Point the camera clearly at food and scan again.
+                  </div>
+                )}
+                <button 
+                  onClick={resetScanner}
+                  style={{ background: 'none', border: '1px solid var(--text-dim)', color: '#fff', padding: '12px 24px', borderRadius: '24px', fontSize: '1rem', cursor: 'pointer' }}
+                >
+                  TRY AGAIN
+                </button>
+              </>
+            )}
+
           </div>
         )}
       </div>
@@ -139,12 +222,12 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
       <div style={{ padding: '40px', display: 'flex', justifyContent: 'center', background: '#000' }}>
         <button 
           onClick={captureAndAnalyze}
-          disabled={phase !== 'IDLE'}
+          disabled={phase === 'ANALYZING'}
           style={{ 
             width: '80px', height: '80px', borderRadius: '40px', 
-            background: phase === 'IDLE' ? 'var(--accent-cyan)' : 'var(--text-dim)', 
+            background: phase === 'ANALYZING' ? 'var(--text-dim)' : 'var(--accent-cyan)', 
             border: '4px solid #fff', display: 'flex', justifyContent: 'center', alignItems: 'center',
-            cursor: phase === 'IDLE' ? 'pointer' : 'not-allowed',
+            cursor: phase === 'ANALYZING' ? 'not-allowed' : 'pointer',
             transition: 'all 0.2s'
           }}
         >
