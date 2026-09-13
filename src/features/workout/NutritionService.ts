@@ -64,7 +64,7 @@ export class NutritionService {
   /**
    * Sends image to real Gemini Vision API
    */
-  public static async analyzeFoodImage(base64DataUrl: string, scanId: string): Promise<AIAnalysisResult> {
+  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, modelName: string = 'gemini-1.5-flash'): Promise<AIAnalysisResult> {
     const diagnostics: AIAnalysisResult['diagnostics'] = {
       scanId,
       cameraCapture: 'PASS',
@@ -97,7 +97,8 @@ export class NutritionService {
       diagnostics.imageSent = 'PASS';
       diagnostics.apiRequest = 'PASS';
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

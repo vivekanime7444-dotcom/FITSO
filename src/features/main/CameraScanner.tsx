@@ -18,10 +18,16 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<AIAnalysisResult['diagnostics'] | null>(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
+  const [modelName, setModelName] = useState(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-1.5-flash-latest');
 
   const saveApiKey = (key: string) => {
     setApiKey(key);
     localStorage.setItem('GEMINI_API_KEY', key);
+  };
+  
+  const saveModelName = (name: string) => {
+    setModelName(name);
+    localStorage.setItem('GEMINI_MODEL_NAME', name);
   };
   
   useEffect(() => {
@@ -71,7 +77,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     const scanId = 'scan_' + crypto.randomUUID().substring(0, 8);
 
     try {
-      const result = await NutritionService.analyzeFoodImage(base64Image, scanId);
+      const result = await NutritionService.analyzeFoodImage(base64Image, scanId, modelName);
       setDiagnostics(result.diagnostics);
 
       if (result.success && result.meal) {
@@ -130,6 +136,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
               onChange={(e) => saveApiKey(e.target.value)} 
               placeholder="Paste API Key here..."
               style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>MODEL NAME:</div>
+            <input 
+              type="text" 
+              value={modelName} 
+              onChange={(e) => saveModelName(e.target.value)} 
+              placeholder="gemini-1.5-flash-latest"
+              style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px', fontFamily: 'monospace' }}
             />
           </div>
 
