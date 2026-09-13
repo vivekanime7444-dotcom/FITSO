@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { StepTrackingService } from '../workout/StepTrackingService';
-import { Footprints, Plus, History, Activity as ActivityIcon, Clock, Map } from 'lucide-react';
+import { Footprints, Plus, History, Clock, Map, AlertTriangle } from 'lucide-react';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
 import styles from './MainScreens.module.css';
@@ -13,13 +13,18 @@ export const Activity: React.FC = () => {
   const [newGoal, setNewGoal] = useState(stepGoal.toString());
   const [activeTab, setActiveTab] = useState<'week' | 'month'>('week');
 
-  // Trigger store init on mount if needed
+  // Trigger sync on mount
   useEffect(() => {
-    useActivityStore.getState().initializeToday();
+    StepTrackingService.sync();
   }, []);
 
-  const steps = dailyActivity?.steps || 0;
-  const progress = Math.min((steps / stepGoal) * 100, 100);
+  const totalSteps = dailyActivity?.totalSteps || 0;
+  const autoSteps = dailyActivity?.automaticSteps || 0;
+  const manualCount = dailyActivity?.manualSteps || 0;
+  
+  const progress = Math.min((totalSteps / stepGoal) * 100, 100);
+  const status = StepTrackingService.status;
+  const isWebUnsupported = status === 'DEVICE STEP SENSOR NOT ACCESSIBLE';
 
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,11 +48,9 @@ export const Activity: React.FC = () => {
   };
 
   const getWeekHistory = () => {
-    // Return last 7 days including today for the visual graph
     const result = [];
     const today = new Date();
     
-    // Reverse loop to go from 6 days ago to today
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
       d.setDate(d.getDate() - i);
@@ -60,7 +63,7 @@ export const Activity: React.FC = () => {
       result.push({
         date: d,
         dayName: d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-        steps: record?.steps || 0
+        steps: record?.totalSteps || 0
       });
     }
     return result;
@@ -74,11 +77,26 @@ export const Activity: React.FC = () => {
       <div className={styles.systemOuterFrame}>
         <div className={styles.statusTitleBox}>TODAY'S ACTIVITY</div>
         
+        {isWebUnsupported && (
+          <div style={{ 
+            marginTop: '16px', padding: '12px', background: 'rgba(255, 170, 0, 0.1)', 
+            border: '1px solid rgba(255, 170, 0, 0.3)', borderRadius: '8px', 
+            color: '#ffaa00', display: 'flex', alignItems: 'flex-start', gap: '8px',
+            fontSize: '0.85rem'
+          }}>
+            <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>CURRENT WEB VERSION: DEVICE STEP SENSOR NOT ACCESSIBLE.</strong><br/>
+              Automatic background tracking requires a native mobile application.
+            </div>
+          </div>
+        )}
+
         <div style={{ textAlign: 'center', margin: '24px 0' }}>
           <Footprints size={48} style={{ color: 'var(--accent-cyan)', marginBottom: '16px', opacity: 0.8 }} />
           
           <div style={{ fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1', color: 'var(--text-primary)', textShadow: 'var(--system-glow)' }}>
-            {steps.toLocaleString()}
+            {totalSteps.toLocaleString()}
           </div>
           
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
@@ -107,6 +125,10 @@ export const Activity: React.FC = () => {
                 {stepGoal.toLocaleString()}
               </button>
             )}
+          </div>
+
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '8px' }}>
+            {autoSteps.toLocaleString()} AUTO • {manualCount.toLocaleString()} MANUAL
           </div>
         </div>
 
@@ -144,40 +166,33 @@ export const Activity: React.FC = () => {
           </div>
         </div>
 
-        {/* SENSOR STATUS */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', background: 'var(--surface-bg)', borderRadius: '8px', fontSize: '0.9rem', color: StepTrackingService.isTrackingActive ? '#10b981' : 'var(--text-dim)' }}>
-          <ActivityIcon size={16} />
-          {StepTrackingService.isTrackingActive ? 'SENSOR ACTIVE' : 'SENSOR INACTIVE'}
-        </div>
       </div>
 
       {/* MANUAL ENTRY */}
-      <div className={styles.systemOuterFrame}>
-        <div className={styles.statusTitleBox}>MANUAL PROTOCOL</div>
-        <form onSubmit={handleManualAdd} style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-          <input
-            type="number"
-            placeholder="Enter steps (e.g., 2000)"
-            value={manualSteps}
-            onChange={(e) => setManualSteps(e.target.value)}
-            style={{ flex: 1, padding: '16px', background: 'var(--surface-bg)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: '8px', fontFamily: 'var(--font-system)' }}
-          />
-          <button 
-            type="submit"
-            disabled={!manualSteps || parseInt(manualSteps) <= 0}
-            style={{ padding: '0 24px', background: 'var(--accent-cyan)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: manualSteps ? 'pointer' : 'not-allowed', opacity: manualSteps ? 1 : 0.5 }}
-          >
-            <Plus size={24} />
-          </button>
-        </form>
-        
-        {import.meta.env.DEV && (
-          <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-            <button onClick={() => StepTrackingService.addMockSteps(100)} style={{ flex: 1, padding: '8px', background: 'var(--border-subtle)', color: 'var(--text-secondary)', border: 'none' }}>+100 TEST</button>
-            <button onClick={() => StepTrackingService.addMockSteps(1000)} style={{ flex: 1, padding: '8px', background: 'var(--border-subtle)', color: 'var(--text-secondary)', border: 'none' }}>+1000 TEST</button>
-          </div>
-        )}
-      </div>
+      {isWebUnsupported && (
+        <div className={styles.systemOuterFrame}>
+          <div className={styles.statusTitleBox}>MANUAL ACTIVITY</div>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '12px 0' }}>
+            Automatic tracking unavailable. Enter daily steps from your wearable device:
+          </p>
+          <form onSubmit={handleManualAdd} style={{ display: 'flex', gap: '12px' }}>
+            <input
+              type="number"
+              placeholder="Enter steps (e.g., 2000)"
+              value={manualSteps}
+              onChange={(e) => setManualSteps(e.target.value)}
+              style={{ flex: 1, padding: '16px', background: 'var(--surface-bg)', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)', borderRadius: '8px', fontFamily: 'var(--font-system)' }}
+            />
+            <button 
+              type="submit"
+              disabled={!manualSteps || parseInt(manualSteps) <= 0}
+              style={{ padding: '0 24px', background: 'var(--accent-cyan)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: manualSteps ? 'pointer' : 'not-allowed', opacity: manualSteps ? 1 : 0.5 }}
+            >
+              <Plus size={24} />
+            </button>
+          </form>
+        </div>
+      )}
 
       {/* HISTORY */}
       <div className={styles.systemOuterFrame} style={{ marginBottom: '80px' }}>

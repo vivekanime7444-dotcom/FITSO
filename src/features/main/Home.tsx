@@ -97,13 +97,13 @@ export const Home: React.FC = () => {
                    <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
                      {(() => {
                        const { dailyActivity } = useActivityStore.getState();
-                       return (dailyActivity?.steps || 0).toLocaleString();
+                       return (dailyActivity?.totalSteps || 0).toLocaleString();
                      })()} STEPS
                    </div>
                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                      {(() => {
                        const { dailyActivity, stepGoal } = useActivityStore.getState();
-                       const steps = dailyActivity?.steps || 0;
+                       const steps = dailyActivity?.totalSteps || 0;
                        return `${Math.min(Math.round((steps / stepGoal) * 100), 100)}% COMPLETE`;
                      })()}
                    </div>

@@ -7,8 +7,10 @@ import { Workout } from './features/main/Workout';
 import { Progress } from './features/main/Progress';
 import { Profile } from './features/main/Profile';
 import { Activity } from './features/main/Activity';
+import { DevActivity } from './features/main/DevActivity';
 import { WorkoutSchedulerService } from './features/workout/WorkoutSchedulerService';
 import { StepTrackingService } from './features/workout/StepTrackingService';
+import { useActivityStore } from './store/useActivityStore';
 
 const App: React.FC = () => {
   React.useEffect(() => {
@@ -17,7 +19,19 @@ const App: React.FC = () => {
     
     // We can't request notifications on mount without interaction in modern browsers,
     // so we'll wait for the user to interact with the scheduling UI later,
-    // but the service will still track internal state.
+    // or we can request it if they interact with the profile page.
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        StepTrackingService.sync();
+        useActivityStore.getState().checkRollover(StepTrackingService.source);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   return (
@@ -32,6 +46,7 @@ const App: React.FC = () => {
           <Route index element={<Home />} />
           <Route path="workout" element={<Workout />} />
           <Route path="activity" element={<Activity />} />
+          <Route path="dev-activity" element={<DevActivity />} />
           <Route path="progress" element={<Progress />} />
           <Route path="profile" element={<Profile />} />
         </Route>

@@ -1,17 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type ActivitySource = 'DEVICE' | 'MANUAL';
-
 export interface DailyActivity {
   date: string; // YYYY-MM-DD local
-  steps: number;
+  automaticSteps: number;
+  manualSteps: number;
+  totalSteps: number;
   stepGoal: number;
   distance: number | null; // meters
   activeTime: number | null; // seconds
   estimatedEnergy: number | null; // kcal
-  source: ActivitySource;
-  lastUpdated: number; // timestamp
+  source: string; // e.g., 'WEB_UNSUPPORTED', 'NATIVE_IOS', 'NATIVE_ANDROID'
+  lastSyncedAt: number | null;
 }
 
 interface ActivityState {
@@ -20,24 +20,27 @@ interface ActivityState {
   stepGoal: number;
   
   // Actions
-  initializeToday: () => void;
-  checkRollover: () => void;
+  initializeToday: (source: string) => void;
+  checkRollover: (source: string) => void;
   setStepGoal: (goal: number) => void;
-  addSteps: (steps: number, source: ActivitySource) => void;
-  addManualActivity: (steps: number, distance?: number, activeTime?: number) => void;
+  syncAutomaticSteps: (steps: number, source: string, distance?: number, activeTime?: number) => void;
+  addManualActivity: (steps: number) => void;
+  overwriteHistory: (historicalData: Record<string, number>, source: string) => void;
 }
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
-const createEmptyDay = (date: string, stepGoal: number): DailyActivity => ({
+const createEmptyDay = (date: string, stepGoal: number, source: string): DailyActivity => ({
   date,
-  steps: 0,
+  automaticSteps: 0,
+  manualSteps: 0,
+  totalSteps: 0,
   stepGoal,
   distance: null,
   activeTime: null,
   estimatedEnergy: null,
-  source: 'DEVICE',
-  lastUpdated: Date.now()
+  source,
+  lastSyncedAt: null
 });
 
 export const useActivityStore = create<ActivityState>()(
@@ -47,35 +50,36 @@ export const useActivityStore = create<ActivityState>()(
       history: [],
       stepGoal: 8000,
 
-      initializeToday: () => {
+      initializeToday: (source) => {
         const todayStr = getTodayStr();
         const { dailyActivity, stepGoal, checkRollover } = get();
         
-        checkRollover(); // Make sure any past day is archived
+        checkRollover(source); 
 
         if (!dailyActivity || dailyActivity.date !== todayStr) {
-          set({ dailyActivity: createEmptyDay(todayStr, stepGoal) });
+          set({ dailyActivity: createEmptyDay(todayStr, stepGoal, source) });
+        } else if (dailyActivity.source !== source) {
+           set({ dailyActivity: { ...dailyActivity, source } });
         }
       },
 
-      checkRollover: () => {
+      checkRollover: (source) => {
         const todayStr = getTodayStr();
-        const { dailyActivity, history } = get();
+        const { dailyActivity, history, stepGoal } = get();
         
         if (dailyActivity && dailyActivity.date !== todayStr) {
-          // It's a new day, archive the old one
-          // Prevent duplicates
           const existingHistoryIndex = history.findIndex(h => h.date === dailyActivity.date);
           const newHistory = [...history];
+          
           if (existingHistoryIndex >= 0) {
             newHistory[existingHistoryIndex] = dailyActivity;
           } else {
-            newHistory.unshift(dailyActivity); // Add to beginning
+            newHistory.unshift(dailyActivity); 
           }
           
           set({
             history: newHistory,
-            dailyActivity: createEmptyDay(todayStr, get().stepGoal)
+            dailyActivity: createEmptyDay(todayStr, stepGoal, source)
           });
         }
       },
@@ -86,54 +90,89 @@ export const useActivityStore = create<ActivityState>()(
           dailyActivity: state.dailyActivity ? { ...state.dailyActivity, stepGoal: goal } : null
         })),
 
-      addSteps: (steps, source) => {
-        get().checkRollover();
+      syncAutomaticSteps: (steps, source, distance, activeTime) => {
+        get().checkRollover(source);
         set((state) => {
           if (!state.dailyActivity) return state;
           
-          const newSteps = state.dailyActivity.steps + steps;
-          // Simple estimation: 1 step ≈ 0.75 meters
-          const estimatedDistance = newSteps * 0.75;
-          // Simple estimation: 1 step ≈ 0.04 kcal
-          const estimatedEnergy = newSteps * 0.04;
-          // Simple estimation: 100 steps per minute walking
-          const estimatedActiveTime = Math.floor((newSteps / 100) * 60);
+          const totalSteps = steps + state.dailyActivity.manualSteps;
+          const estimatedDistance = distance ?? (totalSteps * 0.75);
+          const estimatedEnergy = totalSteps * 0.04;
+          const estimatedActiveTime = activeTime ?? Math.floor((totalSteps / 100) * 60);
 
           return {
             dailyActivity: {
               ...state.dailyActivity,
-              steps: newSteps,
+              automaticSteps: steps,
+              totalSteps: totalSteps,
               source,
-              distance: state.dailyActivity.distance !== null ? state.dailyActivity.distance : estimatedDistance,
-              estimatedEnergy: state.dailyActivity.estimatedEnergy !== null ? state.dailyActivity.estimatedEnergy : estimatedEnergy,
-              activeTime: state.dailyActivity.activeTime !== null ? state.dailyActivity.activeTime : estimatedActiveTime,
-              lastUpdated: Date.now()
+              distance: estimatedDistance,
+              estimatedEnergy: estimatedEnergy,
+              activeTime: estimatedActiveTime,
+              lastSyncedAt: Date.now()
             }
           };
         });
       },
 
-      addManualActivity: (steps, distance, activeTime) => {
-        get().checkRollover();
+      addManualActivity: (steps) => {
+        const source = get().dailyActivity?.source || 'MANUAL';
+        get().checkRollover(source);
         set((state) => {
           if (!state.dailyActivity) return state;
           
-          const newSteps = state.dailyActivity.steps + steps;
-          const estimatedDistance = distance || (newSteps * 0.75);
-          const estimatedEnergy = newSteps * 0.04;
-          const estimatedActiveTime = activeTime || Math.floor((newSteps / 100) * 60);
+          const newManual = state.dailyActivity.manualSteps + steps;
+          const totalSteps = state.dailyActivity.automaticSteps + newManual;
+          
+          const estimatedDistance = totalSteps * 0.75;
+          const estimatedEnergy = totalSteps * 0.04;
+          const estimatedActiveTime = Math.floor((totalSteps / 100) * 60);
 
           return {
             dailyActivity: {
               ...state.dailyActivity,
-              steps: newSteps,
-              source: 'MANUAL',
+              manualSteps: newManual,
+              totalSteps: totalSteps,
               distance: estimatedDistance,
               estimatedEnergy: estimatedEnergy,
               activeTime: estimatedActiveTime,
-              lastUpdated: Date.now()
             }
           };
+        });
+      },
+
+      overwriteHistory: (historicalData, source) => {
+        set((state) => {
+           const newHistory = [...state.history];
+           Object.entries(historicalData).forEach(([dateStr, steps]) => {
+              // Ignore today, as today is tracked in dailyActivity
+              if (dateStr === getTodayStr()) return;
+              
+              const existingIdx = newHistory.findIndex(h => h.date === dateStr);
+              if (existingIdx >= 0) {
+                 newHistory[existingIdx] = {
+                   ...newHistory[existingIdx],
+                   automaticSteps: steps,
+                   totalSteps: steps + newHistory[existingIdx].manualSteps,
+                   source,
+                   distance: (steps + newHistory[existingIdx].manualSteps) * 0.75,
+                   estimatedEnergy: (steps + newHistory[existingIdx].manualSteps) * 0.04,
+                   activeTime: Math.floor(((steps + newHistory[existingIdx].manualSteps) / 100) * 60)
+                 };
+              } else {
+                 newHistory.unshift(createEmptyDay(dateStr, state.stepGoal, source));
+                 newHistory[0].automaticSteps = steps;
+                 newHistory[0].totalSteps = steps;
+                 newHistory[0].distance = steps * 0.75;
+                 newHistory[0].estimatedEnergy = steps * 0.04;
+                 newHistory[0].activeTime = Math.floor((steps / 100) * 60);
+              }
+           });
+           
+           // Sort history descending
+           newHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+           
+           return { history: newHistory };
         });
       }
     }),
