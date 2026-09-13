@@ -8,7 +8,8 @@ import { generateWeeklySplit } from '../workout/splitGenerator';
 import { getExerciseById } from '../workout/exerciseDatabase';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
-import { Play, Check, Timer, ChevronRight, ShieldAlert, Zap, ZapOff } from 'lucide-react';
+import { SystemVoiceService } from '../workout/SystemVoiceService';
+import { Play, Check, Timer, ChevronRight, ShieldAlert, Zap, ZapOff, Volume2, VolumeX } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
@@ -21,6 +22,8 @@ export const Workout: React.FC = () => {
     cancelActiveWorkout,
     soundsEnabled,
     setSoundsEnabled,
+    voiceEnabled,
+    setVoiceEnabled,
     workoutHistory,
     weeklyPlan,
     setWeeklyPlan
@@ -37,6 +40,39 @@ export const Workout: React.FC = () => {
   useEffect(() => {
     SoundEffectService.setEnabled(soundsEnabled);
   }, [soundsEnabled]);
+
+  useEffect(() => {
+    SystemVoiceService.setEnabled(voiceEnabled);
+  }, [voiceEnabled]);
+
+  // Strict cleanup on unmount
+  useEffect(() => {
+    return () => {
+      SystemVoiceService.endSession();
+    };
+  }, []);
+
+  const playNextSetVoice = (exIndex: number, setIndex: number, delay = 0) => {
+    const workout = activeWorkout || proposedWorkout;
+    if (!workout) return;
+    const currentEx = workout.exercises[exIndex];
+    if (!currentEx) return;
+    
+    const def = getExerciseById(currentEx.exerciseId);
+    const currentSet = currentEx.sets[setIndex];
+    
+    if (def && currentSet) {
+      const type = def.movementType === 'repetition' ? 'reps' : 'time';
+      const amount = type === 'reps' ? currentSet.targetReps || 0 : currentSet.targetDuration || 0;
+
+      if (setIndex === 0) {
+        SystemVoiceService.announceExercise(exIndex + 1, def.voiceName, delay);
+        SystemVoiceService.announceSet(setIndex + 1, type, amount, delay + 3000);
+      } else {
+        SystemVoiceService.announceSet(setIndex + 1, type, amount, delay);
+      }
+    }
+  };
 
   useEffect(() => {
     if (profile.isCompleted) {
@@ -73,6 +109,9 @@ export const Workout: React.FC = () => {
       // Rest Complete Sequence
       HapticService.confirm();
       SoundEffectService.playNotification();
+      
+      SystemVoiceService.announceRestComplete(500);
+      playNextSetVoice(currentExerciseIndex, currentSetIndex, 2500);
     }
     return () => clearInterval(interval);
   }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex]);
@@ -103,6 +142,9 @@ export const Workout: React.FC = () => {
           <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '16px' }}>
             <button onClick={() => setSoundsEnabled(!soundsEnabled)} style={{ background: 'none', border: 'none', color: soundsEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
               {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
+            </button>
+            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{ background: 'none', border: 'none', color: voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
+              {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
             </button>
           </div>
 
@@ -138,16 +180,19 @@ export const Workout: React.FC = () => {
   }
 
   const handleStartWorkout = () => {
-    // 1. Initialize Audio/Voice Context on intentional user interaction
     SoundEffectService.init();
     
-    // 2. Play Haptic and Button Sound
     HapticService.light();
     SoundEffectService.playMissionStart();
 
-    if (proposedWorkout) {
-      startWorkout(proposedWorkout);
+    const targetWorkout = proposedWorkout || activeWorkout;
+    if (targetWorkout) {
+      startWorkout(targetWorkout);
+      SystemVoiceService.startSession(targetWorkout.id);
+      SystemVoiceService.announceMissionStart(targetWorkout.workoutName, 800);
+      playNextSetVoice(0, 0, 4000);
     }
+    
     setViewState('active');
     setCurrentExerciseIndex(0);
     setCurrentSetIndex(0);
@@ -169,8 +214,15 @@ export const Workout: React.FC = () => {
     setTimeout(() => {
       if (isLastSet && isLastExercise) {
         completeActiveWorkout();
+        SystemVoiceService.endSession(); // End session immediately on completion
         setViewState('summary');
         SoundEffectService.playMissionComplete();
+        
+        // Wait, if we ended the session, we can't use SystemVoiceService.
+        // We actually want to let the mission complete voice play, so we should end session AFTER the speech.
+        // Let's create a special ID for the complete speech, or just not end it instantly if we want it to speak.
+        // Actually, we can end it when exiting the summary screen. Let's not endSession here!
+        SystemVoiceService.announceWorkoutComplete(800);
       } else if (isLastSet) {
         const exDef = getExerciseById(currentEx.exerciseId);
         setRestTimeLeft(exDef?.defaultRest || 60);
@@ -180,6 +232,7 @@ export const Workout: React.FC = () => {
         setCurrentSetIndex(0);
         
         SoundEffectService.playNotification();
+        SystemVoiceService.announceRest(500);
       } else {
         const exDef = getExerciseById(currentEx.exerciseId);
         setRestTimeLeft(exDef?.defaultRest || 60);
@@ -188,6 +241,7 @@ export const Workout: React.FC = () => {
         setCurrentSetIndex(prev => prev + 1);
         
         SoundEffectService.playNotification();
+        SystemVoiceService.announceRest(500);
       }
     }, 400); // Delay UI transition slightly after click sound
   };
@@ -198,6 +252,8 @@ export const Workout: React.FC = () => {
     setIsResting(false);
     setRestTimeLeft(0);
     setViewState('active');
+    SystemVoiceService.stop(); // Stop any currently playing rest voice
+    playNextSetVoice(currentExerciseIndex, currentSetIndex, 0); // Announce the next set immediately
   };
 
   const getPreviousPerformance = (exerciseId: string) => {
@@ -220,7 +276,6 @@ export const Workout: React.FC = () => {
           HapticService.selection();
           setSoundsEnabled(!soundsEnabled);
           if (!soundsEnabled) {
-             // Will play after state updates
              setTimeout(() => SoundEffectService.playClick(), 50);
           }
         }}
@@ -228,6 +283,19 @@ export const Workout: React.FC = () => {
       >
         {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
       </button>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)' }}>
+        <button 
+          onClick={() => {
+            HapticService.selection();
+            SoundEffectService.playClick();
+            setVoiceEnabled(!voiceEnabled);
+          }}
+          style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}
+        >
+          {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+        </button>
+      </div>
     </div>
   );
 
@@ -315,6 +383,7 @@ export const Workout: React.FC = () => {
           onClick={() => {
             HapticService.light();
             SoundEffectService.playButton();
+            SystemVoiceService.endSession(); // Strict session teardown
             cancelActiveWorkout();
           }}
           style={{ width: '100%', padding: '12px', marginTop: '12px', background: 'transparent', border: 'none', color: 'var(--accent-alert)', fontFamily: 'var(--font-system)' }}
@@ -452,6 +521,7 @@ export const Workout: React.FC = () => {
           onClick={() => { 
             HapticService.light();
             SoundEffectService.playButton();
+            SystemVoiceService.endSession(); // Strict session teardown when leaving
             setViewState('overview'); 
             setProposedWorkout(null); 
           }}
