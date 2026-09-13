@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useActivityStore } from '../../store/useActivityStore';
 import { StepTrackingService } from '../workout/StepTrackingService';
-import { Footprints, Plus, History, Clock, Map, AlertTriangle } from 'lucide-react';
+import { Footprints, Plus, History, Clock, Map } from 'lucide-react';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
 import styles from './MainScreens.module.css';
@@ -77,60 +77,53 @@ export const Activity: React.FC = () => {
       <div className={styles.systemOuterFrame}>
         <div className={styles.statusTitleBox}>TODAY'S ACTIVITY</div>
         
-        {isWebUnsupported && (
-          <div style={{ 
-            marginTop: '16px', padding: '12px', background: 'rgba(255, 170, 0, 0.1)', 
-            border: '1px solid rgba(255, 170, 0, 0.3)', borderRadius: '8px', 
-            color: '#ffaa00', display: 'flex', alignItems: 'flex-start', gap: '8px',
-            fontSize: '0.85rem'
-          }}>
-            <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <strong>CURRENT WEB VERSION: DEVICE STEP SENSOR NOT ACCESSIBLE.</strong><br/>
-              Automatic background tracking requires a native mobile application.
+        {isWebUnsupported && totalSteps === 0 ? (
+          <div style={{ textAlign: 'center', margin: '40px 0' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-dim)', marginBottom: '16px' }}>—</div>
+            <div style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>AUTOMATIC DEVICE DATA</div>
+            <div style={{ fontSize: '1rem', color: 'var(--text-dim)' }}>UNAVAILABLE IN WEB MODE</div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', margin: '24px 0' }}>
+            <Footprints size={48} style={{ color: 'var(--accent-cyan)', marginBottom: '16px', opacity: 0.8 }} />
+            
+            <div style={{ fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1', color: 'var(--text-primary)', textShadow: 'var(--system-glow)' }}>
+              {totalSteps.toLocaleString()}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>STEPS</span>
+              <span style={{ color: 'var(--text-dim)' }}>/</span>
+              {isEditingGoal ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input 
+                    type="number" 
+                    value={newGoal} 
+                    onChange={(e) => setNewGoal(e.target.value)}
+                    style={{ width: '80px', background: 'var(--surface-bg)', border: '1px solid var(--border-accent)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px' }}
+                  />
+                  <button 
+                    onClick={handleGoalSave}
+                    style={{ background: 'var(--accent-cyan)', color: '#000', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                  >
+                    SAVE
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsEditingGoal(true)}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-cyan)', fontSize: '1.2rem', cursor: 'pointer', opacity: 0.8 }}
+                >
+                  {stepGoal.toLocaleString()}
+                </button>
+              )}
+            </div>
+
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '8px' }}>
+              {isWebUnsupported ? 'DEVICE DATA: UNAVAILABLE' : `${autoSteps.toLocaleString()} AUTO`} • {manualCount.toLocaleString()} MANUAL
             </div>
           </div>
         )}
-
-        <div style={{ textAlign: 'center', margin: '24px 0' }}>
-          <Footprints size={48} style={{ color: 'var(--accent-cyan)', marginBottom: '16px', opacity: 0.8 }} />
-          
-          <div style={{ fontSize: '3.5rem', fontWeight: 'bold', lineHeight: '1', color: 'var(--text-primary)', textShadow: 'var(--system-glow)' }}>
-            {totalSteps.toLocaleString()}
-          </div>
-          
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '1.2rem' }}>STEPS</span>
-            <span style={{ color: 'var(--text-dim)' }}>/</span>
-            {isEditingGoal ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input 
-                  type="number" 
-                  value={newGoal} 
-                  onChange={(e) => setNewGoal(e.target.value)}
-                  style={{ width: '80px', background: 'var(--surface-bg)', border: '1px solid var(--border-accent)', color: 'var(--text-primary)', padding: '4px 8px', borderRadius: '4px' }}
-                />
-                <button 
-                  onClick={handleGoalSave}
-                  style={{ background: 'var(--accent-cyan)', color: '#000', border: 'none', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                >
-                  SAVE
-                </button>
-              </div>
-            ) : (
-              <button 
-                onClick={() => setIsEditingGoal(true)}
-                style={{ background: 'none', border: 'none', color: 'var(--accent-cyan)', fontSize: '1.2rem', cursor: 'pointer', opacity: 0.8 }}
-              >
-                {stepGoal.toLocaleString()}
-              </button>
-            )}
-          </div>
-
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '8px' }}>
-            {autoSteps.toLocaleString()} AUTO • {manualCount.toLocaleString()} MANUAL
-          </div>
-        </div>
 
         {/* PROGRESS BAR */}
         <div style={{ width: '100%', height: '8px', background: 'var(--surface-bg)', borderRadius: '4px', overflow: 'hidden', marginBottom: '24px', position: 'relative' }}>

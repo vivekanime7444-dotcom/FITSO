@@ -2,6 +2,7 @@ import React from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { useActivityStore } from '../../store/useActivityStore';
+import { StepTrackingService } from '../workout/StepTrackingService';
 import { User, Target, Calendar, Activity, Footprints } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
@@ -90,41 +91,50 @@ export const Home: React.FC = () => {
 
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
              <div className={styles.statusTitleBox} style={{ margin: '0 0 12px 0' }}>DAILY ACTIVITY</div>
-             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                 <Footprints size={24} style={{ color: 'var(--accent-cyan)' }} />
-                 <div>
-                   <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+             
+             {StepTrackingService.source === 'WebStepProvider' ? (
+               <div style={{ textAlign: 'center', padding: '16px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px' }}>
+                 <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-dim)', marginBottom: '8px' }}>—</div>
+                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>AUTOMATIC DEVICE DATA</div>
+                 <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>UNAVAILABLE IN WEB MODE</div>
+               </div>
+             ) : (
+               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <Footprints size={24} style={{ color: 'var(--accent-cyan)' }} />
+                   <div>
+                     <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>
+                       {(() => {
+                         const { dailyActivity } = useActivityStore.getState();
+                         return (dailyActivity?.totalSteps || 0).toLocaleString();
+                       })()} STEPS
+                     </div>
+                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                       {(() => {
+                         const { dailyActivity, stepGoal } = useActivityStore.getState();
+                         const steps = dailyActivity?.totalSteps || 0;
+                         return `${Math.min(Math.round((steps / stepGoal) * 100), 100)}% COMPLETE`;
+                       })()}
+                     </div>
+                   </div>
+                 </div>
+                 
+                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'right' }}>
+                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                      {(() => {
                        const { dailyActivity } = useActivityStore.getState();
-                       return (dailyActivity?.totalSteps || 0).toLocaleString();
-                     })()} STEPS
+                       return dailyActivity?.distance ? `${(dailyActivity.distance / 1000).toFixed(2)} km` : 'DISTANCE UNAVAILABLE';
+                     })()}
                    </div>
                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                      {(() => {
-                       const { dailyActivity, stepGoal } = useActivityStore.getState();
-                       const steps = dailyActivity?.totalSteps || 0;
-                       return `${Math.min(Math.round((steps / stepGoal) * 100), 100)}% COMPLETE`;
+                       const { dailyActivity } = useActivityStore.getState();
+                       return dailyActivity?.activeTime ? `${Math.floor(dailyActivity.activeTime / 60)} min` : 'TIME UNAVAILABLE';
                      })()}
                    </div>
                  </div>
                </div>
-               
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'right' }}>
-                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                   {(() => {
-                     const { dailyActivity } = useActivityStore.getState();
-                     return dailyActivity?.distance ? `${(dailyActivity.distance / 1000).toFixed(2)} km` : 'DISTANCE UNAVAILABLE';
-                   })()}
-                 </div>
-                 <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                   {(() => {
-                     const { dailyActivity } = useActivityStore.getState();
-                     return dailyActivity?.activeTime ? `${Math.floor(dailyActivity.activeTime / 60)} min` : 'TIME UNAVAILABLE';
-                   })()}
-                 </div>
-               </div>
-             </div>
+             )}
           </div>
         </div>
 

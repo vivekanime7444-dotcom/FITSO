@@ -13,34 +13,33 @@ export interface ActivityProvider {
 }
 
 class WebActivityProvider implements ActivityProvider {
-  async isSupported(): Promise<boolean> {
-    // Browsers do not have a native background step API
-    return false;
-  }
-  
-  async requestPermission(): Promise<boolean> {
-    return false;
-  }
+  async isSupported(): Promise<boolean> { return false; }
+  async requestPermission(): Promise<boolean> { return false; }
+  async getPermissionStatus(): Promise<string> { return 'UNAVAILABLE'; }
+  async getTodaySteps(): Promise<number> { return 0; }
+  async getHistoricalSteps(): Promise<Record<string, number>> { return {}; }
+  startSyncListener(): void {}
+  getSourceName(): string { return 'WebStepProvider'; }
+}
 
-  async getPermissionStatus(): Promise<string> {
-    return 'UNAVAILABLE';
-  }
+export class AndroidStepProvider implements ActivityProvider {
+  async isSupported(): Promise<boolean> { return true; }
+  async requestPermission(): Promise<boolean> { throw new Error('Not implemented'); }
+  async getPermissionStatus(): Promise<string> { return 'UNAVAILABLE'; }
+  async getTodaySteps(): Promise<number> { return 0; }
+  async getHistoricalSteps(): Promise<Record<string, number>> { return {}; }
+  startSyncListener(): void {}
+  getSourceName(): string { return 'AndroidStepProvider'; }
+}
 
-  async getTodaySteps(): Promise<number> {
-    return 0;
-  }
-
-  async getHistoricalSteps(): Promise<Record<string, number>> {
-    return {};
-  }
-
-  startSyncListener(): void {
-    // No-op for web
-  }
-
-  getSourceName(): string {
-    return 'WEB_UNSUPPORTED';
-  }
+export class IOSStepProvider implements ActivityProvider {
+  async isSupported(): Promise<boolean> { return true; }
+  async requestPermission(): Promise<boolean> { throw new Error('Not implemented'); }
+  async getPermissionStatus(): Promise<string> { return 'UNAVAILABLE'; }
+  async getTodaySteps(): Promise<number> { return 0; }
+  async getHistoricalSteps(): Promise<Record<string, number>> { return {}; }
+  startSyncListener(): void {}
+  getSourceName(): string { return 'IOSStepProvider'; }
 }
 
 export class StepTrackingService {

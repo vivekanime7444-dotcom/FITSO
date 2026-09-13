@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useActivityStore } from '../../store/useActivityStore';
 import { StepTrackingService } from '../workout/StepTrackingService';
 import styles from './MainScreens.module.css';
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const DevActivity: React.FC = () => {
-  const { dailyActivity } = useActivityStore();
   const [status, setStatus] = useState(StepTrackingService.status);
   
   useEffect(() => {
@@ -29,44 +27,30 @@ export const DevActivity: React.FC = () => {
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px', fontFamily: 'monospace' }}>
           <div>
-            <div style={{ color: 'var(--text-dim)' }}>STEP SENSOR STATUS</div>
+            <div style={{ color: 'var(--text-dim)' }}>STEP SYSTEM</div>
             <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>
-              {status === 'DEVICE STEP SENSOR NOT ACCESSIBLE' ? 'UNAVAILABLE' : 'AVAILABLE'}
+              PLATFORM: WEB
             </div>
           </div>
 
           <div>
-            <div style={{ color: 'var(--text-dim)' }}>ACTIVITY PERMISSION</div>
-            <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>
-              {status}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ color: 'var(--text-dim)' }}>DATA SOURCE</div>
+            <div style={{ color: 'var(--text-dim)' }}>PROVIDER:</div>
             <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>
               {StepTrackingService.source}
             </div>
           </div>
 
           <div>
-            <div style={{ color: 'var(--text-dim)' }}>LAST SYNC</div>
+            <div style={{ color: 'var(--text-dim)' }}>DEVICE DATA:</div>
             <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>
-              {dailyActivity?.lastSyncedAt ? new Date(dailyActivity.lastSyncedAt).toLocaleString() : 'NEVER'}
+              {status === 'DEVICE STEP SENSOR NOT ACCESSIBLE' ? 'UNAVAILABLE' : 'AVAILABLE'}
             </div>
           </div>
 
           <div>
-            <div style={{ color: 'var(--text-dim)' }}>TODAY'S DEVICE STEPS</div>
-            <div style={{ color: 'var(--accent-cyan)', fontSize: '2rem', fontWeight: 'bold' }}>
-              {dailyActivity?.automaticSteps || 0}
-            </div>
-          </div>
-          
-          <div>
-            <div style={{ color: 'var(--text-dim)' }}>TODAY'S MANUAL STEPS</div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '1.5rem' }}>
-              {dailyActivity?.manualSteps || 0}
+            <div style={{ color: 'var(--text-dim)' }}>AUTOMATIC TRACKING:</div>
+            <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>
+              {status === 'DEVICE STEP SENSOR NOT ACCESSIBLE' ? 'WAITING FOR NATIVE INTEGRATION' : 'ACTIVE'}
             </div>
           </div>
         </div>
