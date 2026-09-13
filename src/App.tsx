@@ -4,7 +4,7 @@ import { MainLayout } from './components/layout/MainLayout';
 import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
 import { Home } from './features/main/Home';
 import { Workout } from './features/main/Workout';
-import { Progress } from './features/main/Progress';
+import { Nutrition } from './features/main/Nutrition';
 import { Profile } from './features/main/Profile';
 import { Activity } from './features/main/Activity';
 import { DevActivity } from './features/main/DevActivity';
@@ -47,7 +47,7 @@ const App: React.FC = () => {
           <Route path="workout" element={<Workout />} />
           <Route path="activity" element={<Activity />} />
           <Route path="dev-activity" element={<DevActivity />} />
-          <Route path="progress" element={<Progress />} />
+          <Route path="nutrition" element={<Nutrition />} />
           <Route path="profile" element={<Profile />} />
         </Route>
 

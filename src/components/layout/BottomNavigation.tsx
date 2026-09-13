@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Dumbbell, Activity as ProgressIcon, User, Footprints } from 'lucide-react';
+import { Home, Dumbbell, User, Footprints, Scan } from 'lucide-react';
 import { SoundEffectService } from '../../features/workout/SoundEffectService';
 import { HapticService } from '../../features/workout/HapticService';
 import styles from './BottomNavigation.module.css';
@@ -41,12 +41,12 @@ export const BottomNavigation: React.FC = () => {
       </NavLink>
 
       <NavLink 
-        to="/progress" 
+        to="/nutrition" 
         onClick={playNavSound}
         className={({ isActive }) => `${styles.navItem} ${isActive ? styles.active : ''}`}
       >
-        <ProgressIcon size={24} />
-        <span className={styles.label}>PROGRESS</span>
+        <Scan size={24} />
+        <span className={styles.label}>NUTRITION</span>
       </NavLink>
 
       <NavLink 
