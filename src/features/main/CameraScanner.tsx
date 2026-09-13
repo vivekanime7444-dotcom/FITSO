@@ -141,13 +141,37 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
 
           <div style={{ marginBottom: '24px' }}>
             <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>MODEL NAME:</div>
-            <input 
-              type="text" 
-              value={modelName} 
-              onChange={(e) => saveModelName(e.target.value)} 
-              placeholder="gemini-1.5-flash-latest"
-              style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px', fontFamily: 'monospace' }}
-            />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input 
+                type="text" 
+                value={modelName} 
+                onChange={(e) => saveModelName(e.target.value)} 
+                placeholder="gemini-1.5-flash-latest"
+                style={{ flex: 1, padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px', fontFamily: 'monospace' }}
+              />
+              <button 
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                    const data = await res.json();
+                    if (data.models) {
+                      const modelNames = data.models.map((m: any) => m.name.replace('models/', '')).join('\n');
+                      alert("AVAILABLE MODELS FOR YOUR KEY:\n\n" + modelNames);
+                    } else {
+                      alert("Error fetching models: " + JSON.stringify(data));
+                    }
+                  } catch (e: any) {
+                    alert("Network error: " + e.message);
+                  }
+                }}
+                style={{ padding: '8px 16px', background: 'var(--accent-cyan)', color: '#000', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' }}
+              >
+                CHECK MODELS
+              </button>
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+              Click CHECK MODELS to see which models your API key actually supports.
+            </div>
           </div>
 
           {diagnostics ? (
