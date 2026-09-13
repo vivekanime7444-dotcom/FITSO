@@ -17,17 +17,49 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   // Diagnostics State
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<AIAnalysisResult['diagnostics'] | null>(null);
+  
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'anthropic'>(
+    (localStorage.getItem('AI_PROVIDER') as any) || 'gemini'
+  );
   const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
+  const [openAiKey, setOpenAiKey] = useState(localStorage.getItem('OPENAI_API_KEY') || '');
+  const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem('ANTHROPIC_API_KEY') || '');
   const [modelName, setModelName] = useState(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-flash-latest');
+
+  const saveAiProvider = (provider: 'gemini' | 'openai' | 'anthropic') => {
+    setAiProvider(provider);
+    localStorage.setItem('AI_PROVIDER', provider);
+    
+    // Set default models when switching
+    if (provider === 'gemini') {
+      setModelName(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-flash-latest');
+    } else if (provider === 'openai') {
+      setModelName(localStorage.getItem('OPENAI_MODEL_NAME') || 'gpt-4o');
+    } else if (provider === 'anthropic') {
+      setModelName(localStorage.getItem('ANTHROPIC_MODEL_NAME') || 'claude-3-5-sonnet-20241022');
+    }
+  };
 
   const saveApiKey = (key: string) => {
     setApiKey(key);
     localStorage.setItem('GEMINI_API_KEY', key);
   };
   
+  const saveOpenAiKey = (key: string) => {
+    setOpenAiKey(key);
+    localStorage.setItem('OPENAI_API_KEY', key);
+  };
+  
+  const saveAnthropicKey = (key: string) => {
+    setAnthropicKey(key);
+    localStorage.setItem('ANTHROPIC_API_KEY', key);
+  };
+
   const saveModelName = (name: string) => {
     setModelName(name);
-    localStorage.setItem('GEMINI_MODEL_NAME', name);
+    if (aiProvider === 'gemini') localStorage.setItem('GEMINI_MODEL_NAME', name);
+    if (aiProvider === 'openai') localStorage.setItem('OPENAI_MODEL_NAME', name);
+    if (aiProvider === 'anthropic') localStorage.setItem('ANTHROPIC_MODEL_NAME', name);
   };
   
   useEffect(() => {
@@ -77,7 +109,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     const scanId = 'scan_' + crypto.randomUUID().substring(0, 8);
 
     try {
-      const result = await NutritionService.analyzeFoodImage(base64Image, scanId, modelName);
+      const result = await NutritionService.analyzeFoodImage(base64Image, scanId, aiProvider, modelName);
       setDiagnostics(result.diagnostics);
 
       if (result.success && result.meal) {
@@ -129,14 +161,47 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
           <h3 style={{ color: 'var(--accent-cyan)', marginTop: 0 }}>DEVELOPER DIAGNOSTICS</h3>
           
           <div style={{ marginBottom: '16px' }}>
-            <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>GEMINI API KEY:</div>
-            <input 
-              type="password" 
-              value={apiKey} 
-              onChange={(e) => saveApiKey(e.target.value)} 
-              placeholder="Paste API Key here..."
-              style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
-            />
+            <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>AI PROVIDER:</div>
+            <select 
+              value={aiProvider} 
+              onChange={(e) => saveAiProvider(e.target.value as any)}
+              style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px', fontFamily: 'monospace' }}
+            >
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI (GPT-4o)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+            </select>
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <div style={{ color: 'var(--text-dim)', marginBottom: '4px' }}>{aiProvider.toUpperCase()} API KEY:</div>
+            {aiProvider === 'gemini' && (
+              <input 
+                type="password" 
+                value={apiKey} 
+                onChange={(e) => saveApiKey(e.target.value)} 
+                placeholder="Paste Gemini API Key here..."
+                style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+              />
+            )}
+            {aiProvider === 'openai' && (
+              <input 
+                type="password" 
+                value={openAiKey} 
+                onChange={(e) => saveOpenAiKey(e.target.value)} 
+                placeholder="Paste OpenAI API Key here (sk-...)"
+                style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+              />
+            )}
+            {aiProvider === 'anthropic' && (
+              <input 
+                type="password" 
+                value={anthropicKey} 
+                onChange={(e) => saveAnthropicKey(e.target.value)} 
+                placeholder="Paste Anthropic API Key here (sk-ant-...)"
+                style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+              />
+            )}
           </div>
 
           <div style={{ marginBottom: '24px' }}>

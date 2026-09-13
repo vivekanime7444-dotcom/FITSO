@@ -67,9 +67,9 @@ You MUST respond in strict JSON matching this structure:
 
 export class NutritionService {
   /**
-   * Sends image to real Gemini Vision API
+   * Sends image to selected AI Provider
    */
-  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, modelName: string = 'gemini-flash-latest'): Promise<AIAnalysisResult> {
+  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, aiProvider: 'gemini' | 'openai' | 'anthropic' = 'gemini', modelName: string = 'gemini-flash-latest'): Promise<AIAnalysisResult> {
     const diagnostics: AIAnalysisResult['diagnostics'] = {
       scanId,
       cameraCapture: 'PASS',
@@ -87,84 +87,34 @@ export class NutritionService {
       error: ''
     };
 
-    const rawApiKey = localStorage.getItem('GEMINI_API_KEY');
-    const apiKey = rawApiKey ? rawApiKey.trim() : null;
+    let apiKey = '';
+    if (aiProvider === 'gemini') apiKey = localStorage.getItem('GEMINI_API_KEY') || '';
+    if (aiProvider === 'openai') apiKey = localStorage.getItem('OPENAI_API_KEY') || '';
+    if (aiProvider === 'anthropic') apiKey = localStorage.getItem('ANTHROPIC_API_KEY') || '';
+    apiKey = apiKey.trim();
 
     if (!apiKey) {
       diagnostics.error = 'API_KEY_MISSING';
       diagnostics.finalResult = 'SCAN FAILED';
-      return { success: false, reason: 'SCAN FAILED — API KEY MISSING', diagnostics };
+      return { success: false, reason: `SCAN FAILED — ${aiProvider.toUpperCase()} API KEY MISSING`, diagnostics };
     }
 
     try {
-      // Extract base64 without prefix
       const base64Img = base64DataUrl.split(',')[1];
       diagnostics.imageSent = 'PASS';
       diagnostics.apiRequest = 'PASS';
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      
-      let response: Response | null = null;
-      let retries = 2; // Try up to 3 times total
-      
-      while (retries >= 0) {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{
-              parts: [
-                { text: "Analyze this image according to your system instructions and return the JSON." },
-                { inline_data: { mime_type: "image/jpeg", data: base64Img } }
-              ]
-            }],
-            generationConfig: {
-              response_mime_type: "application/json"
-            }
-          })
-        });
+      let jsonStr = '';
 
-        diagnostics.apiStatus = response.status;
-
-        // If 503 High Demand, and we have retries left, wait and retry
-        if (response.status === 503 && retries > 0) {
-          retries--;
-          // Wait 2 seconds before retrying
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
-        }
-        
-        // Break out of loop if not 503 or no retries left
-        break;
-      }
-      
-      if (!response) {
-        throw new Error("Failed to execute API request");
+      if (aiProvider === 'gemini') {
+        jsonStr = await this.fetchGemini(apiKey, modelName, base64Img, diagnostics);
+      } else if (aiProvider === 'openai') {
+        jsonStr = await this.fetchOpenAI(apiKey, modelName, base64DataUrl, diagnostics);
+      } else if (aiProvider === 'anthropic') {
+        jsonStr = await this.fetchAnthropic(apiKey, modelName, base64Img, diagnostics);
       }
 
-      if (!response.ok) {
-        let errorBody = '';
-        try {
-           const errJson = await response.json();
-           errorBody = JSON.stringify(errJson);
-        } catch (e) {
-           errorBody = await response.text();
-        }
-        diagnostics.rawResponse = errorBody;
-        diagnostics.rawResponseAvailable = 'YES (ERROR)';
-        throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
-      }
-
-      diagnostics.visionResponseReceived = 'PASS';
-      const data = await response.json();
-      diagnostics.rawResponse = data;
-      diagnostics.rawResponseAvailable = 'YES';
-
-      let jsonStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!jsonStr) throw new Error("No text response from API");
-
-      // Robust JSON extraction (strip markdown blocks if Gemini ignores response_mime_type)
+      // Robust JSON extraction
       jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim();
 
       let parsed;
@@ -180,32 +130,19 @@ export class NutritionService {
 
       if (parsed.status === 'NO_FOOD') {
         diagnostics.finalResult = 'NO FOOD DETECTED';
-        return { 
-          success: false, 
-          reason: parsed.reason || 'NO FOOD DETECTED', 
-          diagnostics 
-        };
+        return { success: false, reason: parsed.reason || 'NO FOOD DETECTED', diagnostics };
       }
 
       if (parsed.status === 'UNCERTAIN') {
         diagnostics.finalResult = 'FOOD NOT CONFIDENTLY IDENTIFIED';
-        return { 
-          success: false, 
-          reason: parsed.reason || 'FOOD NOT CONFIDENTLY IDENTIFIED', 
-          diagnostics 
-        };
+        return { success: false, reason: parsed.reason || 'FOOD NOT CONFIDENTLY IDENTIFIED', diagnostics };
       }
 
       if (!parsed.items || parsed.items.length === 0) {
         diagnostics.finalResult = 'FOOD NOT CONFIDENTLY IDENTIFIED';
-        return { 
-          success: false, 
-          reason: 'FOOD NOT CONFIDENTLY IDENTIFIED', 
-          diagnostics 
-        };
+        return { success: false, reason: 'FOOD NOT CONFIDENTLY IDENTIFIED', diagnostics };
       }
 
-      // We have food. Map to Meal object.
       const detectedItems: LoggedFood[] = parsed.items.map((item: any) => ({
         id: crypto.randomUUID(),
         name: item.name || 'Unknown Food',
@@ -223,7 +160,6 @@ export class NutritionService {
       const totalFat = detectedItems.reduce((sum, item) => sum + item.fat, 0);
 
       const mealType = this.determineMealType();
-
       diagnostics.finalResult = 'FOOD LOGGED';
 
       return {
@@ -241,11 +177,149 @@ export class NutritionService {
       };
 
     } catch (e: any) {
-      console.error("Vision API Error:", e);
+      console.error(`${aiProvider} Vision API Error:`, e);
       diagnostics.error = e.message;
       diagnostics.finalResult = 'SCAN FAILED';
       return { success: false, reason: 'SCAN FAILED — PLEASE TRY AGAIN', diagnostics };
     }
+  }
+
+  private static async fetchGemini(apiKey: string, modelName: string, base64Img: string, diagnostics: any): Promise<string> {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    
+    let response: Response | null = null;
+    let retries = 2;
+    
+    while (retries >= 0) {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{
+            parts: [
+              { text: "Analyze this image according to your system instructions and return the JSON." },
+              { inline_data: { mime_type: "image/jpeg", data: base64Img } }
+            ]
+          }],
+          generationConfig: { response_mime_type: "application/json" }
+        })
+      });
+
+      diagnostics.apiStatus = response.status;
+      if (response.status === 503 && retries > 0) {
+        retries--;
+        await new Promise(r => setTimeout(r, 2000));
+        continue;
+      }
+      break;
+    }
+    
+    if (!response) throw new Error("Failed to execute API request");
+
+    if (!response.ok) {
+      let errorBody = await response.text();
+      diagnostics.rawResponse = errorBody;
+      diagnostics.rawResponseAvailable = 'YES (ERROR)';
+      throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
+    }
+
+    diagnostics.visionResponseReceived = 'PASS';
+    const data = await response.json();
+    diagnostics.rawResponse = data;
+    diagnostics.rawResponseAvailable = 'YES';
+
+    const jsonStr = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!jsonStr) throw new Error("No text response from Gemini API");
+    return jsonStr;
+  }
+
+  private static async fetchOpenAI(apiKey: string, modelName: string, base64DataUrl: string, diagnostics: any): Promise<string> {
+    const url = 'https://api.openai.com/v1/chat/completions';
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelName,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: [
+            { type: "text", text: "Analyze this image and return the JSON." },
+            { type: "image_url", image_url: { url: base64DataUrl } }
+          ]}
+        ],
+        max_tokens: 1000
+      })
+    });
+
+    diagnostics.apiStatus = response.status;
+
+    if (!response.ok) {
+      let errorBody = await response.text();
+      diagnostics.rawResponse = errorBody;
+      diagnostics.rawResponseAvailable = 'YES (ERROR)';
+      throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
+    }
+
+    diagnostics.visionResponseReceived = 'PASS';
+    const data = await response.json();
+    diagnostics.rawResponse = data;
+    diagnostics.rawResponseAvailable = 'YES';
+
+    const jsonStr = data.choices?.[0]?.message?.content;
+    if (!jsonStr) throw new Error("No text response from OpenAI API");
+    return jsonStr;
+  }
+
+  private static async fetchAnthropic(apiKey: string, modelName: string, base64Img: string, diagnostics: any): Promise<string> {
+    // Anthropic requires CORS proxy if run from browser, but we will send directly.
+    // If running in browser without proxy, it will likely CORS fail unless handled, 
+    // but the implementation logic remains the same.
+    const url = 'https://api.anthropic.com/v1/messages';
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true' // Allow browser access
+      },
+      body: JSON.stringify({
+        model: modelName,
+        max_tokens: 1000,
+        system: SYSTEM_PROMPT,
+        messages: [
+          { role: "user", content: [
+            { type: "text", text: "Analyze this image and return the JSON." },
+            { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64Img } }
+          ]}
+        ]
+      })
+    });
+
+    diagnostics.apiStatus = response.status;
+
+    if (!response.ok) {
+      let errorBody = await response.text();
+      diagnostics.rawResponse = errorBody;
+      diagnostics.rawResponseAvailable = 'YES (ERROR)';
+      throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
+    }
+
+    diagnostics.visionResponseReceived = 'PASS';
+    const data = await response.json();
+    diagnostics.rawResponse = data;
+    diagnostics.rawResponseAvailable = 'YES';
+
+    const jsonStr = data.content?.[0]?.text;
+    if (!jsonStr) throw new Error("No text response from Anthropic API");
+    return jsonStr;
   }
 
   public static logMeal(mealData: Omit<Meal, 'id'>) {
