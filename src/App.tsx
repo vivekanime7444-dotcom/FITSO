@@ -6,11 +6,14 @@ import { Home } from './features/main/Home';
 import { Workout } from './features/main/Workout';
 import { Progress } from './features/main/Progress';
 import { Profile } from './features/main/Profile';
+import { Activity } from './features/main/Activity';
 import { WorkoutSchedulerService } from './features/workout/WorkoutSchedulerService';
+import { StepTrackingService } from './features/workout/StepTrackingService';
 
 const App: React.FC = () => {
   React.useEffect(() => {
     WorkoutSchedulerService.initialize();
+    StepTrackingService.initialize();
     
     // We can't request notifications on mount without interaction in modern browsers,
     // so we'll wait for the user to interact with the scheduling UI later,
@@ -28,6 +31,7 @@ const App: React.FC = () => {
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Home />} />
           <Route path="workout" element={<Workout />} />
+          <Route path="activity" element={<Activity />} />
           <Route path="progress" element={<Progress />} />
           <Route path="profile" element={<Profile />} />
         </Route>
