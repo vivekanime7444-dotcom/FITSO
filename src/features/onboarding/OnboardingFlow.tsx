@@ -240,10 +240,9 @@ export const OnboardingFlow: React.FC = () => {
     );
   };
 
-  const renderSchedule = () => {
+    const renderSchedule = () => {
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'] as const;
     const isValid = localProfile.trainingDays.length > 0 && localProfile.preferredWorkoutTime !== '';
-    const timeOptions = ['Morning', 'Afternoon', 'Evening', 'Custom time'] as const;
 
     const toggleDay = (day: any) => {
       let newDays = [...localProfile.trainingDays];
@@ -276,24 +275,13 @@ export const OnboardingFlow: React.FC = () => {
         </div>
 
         <div className={styles.sectionTitle} style={{ marginTop: '24px' }}>PREFERRED TIME</div>
-        <div className={styles.cardsList}>
-          {timeOptions.map(time => (
-            <SelectableCard 
-              key={time}
-              title={time.toUpperCase()}
-              selected={localProfile.preferredWorkoutTime === time}
-              onClick={() => updateLocal({ preferredWorkoutTime: time })}
-            />
-          ))}
-          {localProfile.preferredWorkoutTime === 'Custom time' && (
-            <div className={styles.customTimeWrapper}>
-              <Input 
-                type="time" 
-                value={localProfile.customTime || ''}
-                onChange={(e) => updateLocal({ customTime: e.target.value })}
-              />
-            </div>
-          )}
+        <div style={{ marginBottom: '32px' }}>
+          <Input 
+            type="time" 
+            value={localProfile.preferredWorkoutTime || '07:00'}
+            onChange={(e) => updateLocal({ preferredWorkoutTime: e.target.value })}
+            style={{ fontSize: '1.5rem', textAlign: 'center' }}
+          />
         </div>
 
         <div className={styles.footer}>
@@ -338,7 +326,7 @@ export const OnboardingFlow: React.FC = () => {
           <div className={styles.summarySection}>
             <h3>TRAINING</h3>
             <p><span className={styles.highlight}>{localProfile.trainingDays.length} days/week</span></p>
-            <p>Preferred Time: <span className={styles.highlight}>{localProfile.preferredWorkoutTime === 'Custom time' ? localProfile.customTime : localProfile.preferredWorkoutTime}</span></p>
+            <p>Preferred Time: <span className={styles.highlight}>{localProfile.preferredWorkoutTime}</span></p>
           </div>
         </Card>
 

@@ -77,7 +77,7 @@ export const Home: React.FC = () => {
               <Calendar size={16} className={styles.statIcon} />
               <span className={styles.statName}>TIME:</span>
               <span className={styles.statValue}>
-                {profile.preferredWorkoutTime === 'Custom time' ? profile.customTime : profile.preferredWorkoutTime?.toUpperCase() || 'NONE'}
+                {profile.preferredWorkoutTime || 'NONE'}
               </span>
             </div>
           </div>

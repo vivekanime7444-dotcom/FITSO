@@ -60,7 +60,7 @@ export const Profile: React.FC = () => {
             <div><span className={styles.labelDim}>GOAL:</span> {profile.primaryGoal}</div>
             <div><span className={styles.labelDim}>EXPERIENCE:</span> {profile.experienceLevel}</div>
             <div><span className={styles.labelDim}>WORKOUT DAYS:</span> {profile.trainingDays.join(', ')}</div>
-            <div><span className={styles.labelDim}>PREFERRED TIME:</span> {profile.preferredWorkoutTime === 'Custom time' ? profile.customTime : profile.preferredWorkoutTime}</div>
+            <div><span className={styles.labelDim}>PREFERRED TIME:</span> {profile.preferredWorkoutTime}</div>
             <div><span className={styles.labelDim}>EQUIPMENT:</span> {profile.equipment.join(', ')}</div>
           </div>
         </div>

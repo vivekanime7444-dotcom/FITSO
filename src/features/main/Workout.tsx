@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
-import type { DayOfWeek } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import type { WorkoutSession } from '../../store/useWorkoutStore';
+import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { generateWorkout } from '../workout/workoutGenerator';
 import { generateWeeklySplit } from '../workout/splitGenerator';
 import { getExerciseById } from '../workout/exerciseDatabase';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
 import { SystemVoiceService } from '../workout/SystemVoiceService';
-import { Play, Check, Timer, ChevronRight, ShieldAlert, Zap, ZapOff, Volume2, VolumeX } from 'lucide-react';
+import { WorkoutSchedulerService } from '../workout/WorkoutSchedulerService';
+import { Play, Check, ChevronRight, Zap, ZapOff, Volume2, VolumeX, BellRing, FastForward, Timer, ShieldAlert } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
@@ -28,6 +29,8 @@ export const Workout: React.FC = () => {
     weeklyPlan,
     setWeeklyPlan
   } = useWorkoutStore();
+
+  const { weeklySchedule, updateDayStatus, notificationsEnabled } = useSchedulerStore();
   
   const [proposedWorkout, setProposedWorkout] = useState<WorkoutSession | null>(null);
   const [viewState, setViewState] = useState<'overview' | 'active' | 'rest' | 'summary'>('overview');
@@ -130,39 +133,6 @@ export const Workout: React.FC = () => {
     );
   }
 
-  const days: DayOfWeek[] = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-  const todayStr = days[new Date().getDay()];
-  const todayPlan = weeklyPlan.find(p => p.dayOfWeek === todayStr);
-
-  if (!activeWorkout && todayPlan?.isRestDay) {
-    return (
-      <div className={styles.screenContainer}>
-        <div className={styles.systemOuterFrame} style={{ minHeight: '60vh', textAlign: 'center', justifyContent: 'center', position: 'relative' }}>
-          
-          <div style={{ position: 'absolute', top: '16px', right: '16px', display: 'flex', gap: '16px' }}>
-            <button onClick={() => setSoundsEnabled(!soundsEnabled)} style={{ background: 'none', border: 'none', color: soundsEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
-              {soundsEnabled ? <Zap size={20} /> : <ZapOff size={20} />}
-            </button>
-            <button onClick={() => setVoiceEnabled(!voiceEnabled)} style={{ background: 'none', border: 'none', color: voiceEnabled ? 'var(--text-secondary)' : 'var(--text-dim)', cursor: 'pointer' }}>
-              {voiceEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-            </button>
-          </div>
-
-          <div className={styles.statusTitleBox} style={{ color: 'var(--text-secondary)', borderColor: 'var(--text-secondary)' }}>
-            TODAY'S STATUS
-          </div>
-          <ShieldAlert size={48} style={{ color: 'var(--text-secondary)', margin: '24px auto' }} />
-          <h2 className="system-title" style={{ fontSize: '1.5rem', marginBottom: '16px' }}>
-            RECOVERY PROTOCOL
-          </h2>
-          <p className={styles.panelText}>
-            Today is a rest day.<br/>Recovery is an essential part of the training system.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const displayWorkout = activeWorkout || proposedWorkout;
 
   if (!displayWorkout) {
@@ -192,6 +162,9 @@ export const Workout: React.FC = () => {
       SystemVoiceService.announceMissionStart(targetWorkout.workoutName, 800);
       playNextSetVoice(0, 0, 4000);
     }
+    
+    const today = new Date().toISOString().split('T')[0];
+    updateDayStatus(today, 'COMPLETED');
     
     setViewState('active');
     setCurrentExerciseIndex(0);
@@ -299,26 +272,76 @@ export const Workout: React.FC = () => {
     </div>
   );
 
-  const renderOverview = () => (
+  const renderOverview = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const todaySchedule = weeklySchedule.find(d => d.date === today);
+    const isRestDay = todaySchedule ? todaySchedule.isRestDay : false;
+    const isMissed = todaySchedule?.status === 'MISSED';
+
+    if (isRestDay && !activeWorkout && !isMissed) {
+      return (
+        <div className={styles.screenContainer}>
+          <div className={styles.systemOuterFrame} style={{ minHeight: '60vh', justifyContent: 'center' }}>
+            {renderSensoryControls()}
+            
+            {!notificationsEnabled && (
+              <button 
+                onClick={() => WorkoutSchedulerService.requestNotificationPermission()}
+                style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer' }}
+              >
+                <BellRing size={20} />
+              </button>
+            )}
+
+            <div className={styles.statusTitleBox} style={{ color: 'var(--text-secondary)', borderColor: 'var(--text-secondary)' }}>
+              TODAY'S STATUS
+            </div>
+            <ShieldAlert size={48} style={{ color: 'var(--text-secondary)', margin: '24px auto' }} />
+            <h2 className="system-title" style={{ fontSize: '1.5rem', marginBottom: '16px' }}>
+              RECOVERY PROTOCOL
+            </h2>
+            <p className={styles.panelText}>
+              Today is a scheduled rest day.<br/>Recovery is an essential part of the training system.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className={styles.systemOuterFrame} style={{ position: 'relative' }}>
       {renderSensoryControls()}
+
+      {!notificationsEnabled && (
+        <button 
+          onClick={() => WorkoutSchedulerService.requestNotificationPermission()}
+          style={{ position: 'absolute', top: '16px', left: '16px', background: 'none', border: 'none', color: 'var(--accent-cyan)', cursor: 'pointer' }}
+        >
+          <BellRing size={20} />
+        </button>
+      )}
+
       <div className={styles.statusTitleBox}>TODAY'S MISSION</div>
       
       <div style={{ display: 'flex', gap: '4px', margin: '16px 0', overflowX: 'auto', paddingBottom: '8px' }}>
-        {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map(day => {
-          const plan = weeklyPlan.find(p => p.dayOfWeek === day);
-          const isToday = day === todayStr;
+        {weeklySchedule.map(day => {
+          const isToday = day.status === 'TODAY' || day.date === new Date().toISOString().split('T')[0];
+          let color = 'var(--text-secondary)';
+          if (day.status === 'COMPLETED') color = '#10b981';
+          else if (day.status === 'MISSED') color = 'var(--accent-alert)';
+          else if (isToday) color = 'var(--accent-cyan)';
+          
           return (
-            <div key={day} style={{
+            <div key={day.date} style={{
               flex: '1', minWidth: '40px', padding: '8px 4px', textAlign: 'center',
               backgroundColor: isToday ? 'rgba(0, 240, 255, 0.1)' : 'var(--bg-surface)',
               border: isToday ? '1px solid var(--accent-cyan)' : 'var(--border-thin)',
-              color: isToday ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+              color: color,
               fontSize: '0.7rem'
             }}>
-              <div>{day}</div>
-              <div style={{ marginTop: '4px', fontSize: '0.6rem', color: plan?.isRestDay ? 'var(--text-secondary)' : 'var(--text-primary)' }}>
-                {plan?.isRestDay ? 'REST' : 'WORK'}
+              <div>{day.dayOfWeek}</div>
+              <div style={{ marginTop: '4px', fontSize: '0.6rem', color: day.isRestDay ? 'var(--text-secondary)' : color }}>
+                {day.isRestDay ? 'REST' : (day.status === 'COMPLETED' ? 'DONE' : (day.status === 'MISSED' ? 'MISS' : 'WORK'))}
               </div>
             </div>
           );
@@ -365,18 +388,42 @@ export const Workout: React.FC = () => {
         })}
       </div>
 
-      <button 
-        onClick={handleStartWorkout}
-        style={{
-          width: '100%', padding: '16px', backgroundColor: 'rgba(0, 240, 255, 0.1)', 
-          border: 'var(--border-accent)', color: 'var(--accent-cyan)', 
-          fontFamily: 'var(--font-system)', fontSize: '1.1rem', cursor: 'pointer',
-          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-          boxShadow: 'var(--system-glow-subtle)'
-        }}
-      >
-        <Play size={20} /> {activeWorkout ? 'RESUME MISSION' : 'START MISSION'}
-      </button>
+      {isMissed && !activeWorkout ? (
+        <button 
+          onClick={() => {
+            HapticService.light();
+            SoundEffectService.playButton();
+            // Implement a simple reschedule logic: move to tomorrow for simplicity
+            const today = new Date().toISOString().split('T')[0];
+            const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+            const { rescheduleWorkout } = useSchedulerStore.getState();
+            rescheduleWorkout(today, tomorrow);
+            WorkoutSchedulerService.syncSchedule(); // re-sync
+          }}
+          style={{
+            width: '100%', padding: '16px', backgroundColor: 'rgba(255, 60, 60, 0.1)', 
+            border: '1px solid var(--accent-alert)', color: 'var(--accent-alert)', 
+            fontFamily: 'var(--font-system)', fontSize: '1.1rem', cursor: 'pointer',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+            boxShadow: 'var(--system-glow-subtle)'
+          }}
+        >
+          <FastForward size={20} /> RESCHEDULE TO TOMORROW
+        </button>
+      ) : (
+        <button 
+          onClick={handleStartWorkout}
+          style={{
+            width: '100%', padding: '16px', backgroundColor: 'rgba(0, 240, 255, 0.1)', 
+            border: 'var(--border-accent)', color: 'var(--accent-cyan)', 
+            fontFamily: 'var(--font-system)', fontSize: '1.1rem', cursor: 'pointer',
+            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+            boxShadow: 'var(--system-glow-subtle)'
+          }}
+        >
+          <Play size={20} /> {activeWorkout ? 'RESUME MISSION' : 'START MISSION'}
+        </button>
+      )}
       
       {activeWorkout && (
         <button 
@@ -393,6 +440,7 @@ export const Workout: React.FC = () => {
       )}
     </div>
   );
+  };
 
   const renderActive = () => {
     if (!activeWorkout) return null;

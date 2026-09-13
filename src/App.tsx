@@ -6,8 +6,17 @@ import { Home } from './features/main/Home';
 import { Workout } from './features/main/Workout';
 import { Progress } from './features/main/Progress';
 import { Profile } from './features/main/Profile';
+import { WorkoutSchedulerService } from './features/workout/WorkoutSchedulerService';
 
 const App: React.FC = () => {
+  React.useEffect(() => {
+    WorkoutSchedulerService.initialize();
+    
+    // We can't request notifications on mount without interaction in modern browsers,
+    // so we'll wait for the user to interact with the scheduling UI later,
+    // but the service will still track internal state.
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
