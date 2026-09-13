@@ -98,24 +98,45 @@ export class NutritionService {
       diagnostics.apiRequest = 'PASS';
 
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{
-            parts: [
-              { text: "Analyze this image according to your system instructions and return the JSON." },
-              { inline_data: { mime_type: "image/jpeg", data: base64Img } }
-            ]
-          }],
-          generationConfig: {
-            response_mime_type: "application/json"
-          }
-        })
-      });
+      
+      let response: Response | null = null;
+      let retries = 2; // Try up to 3 times total
+      
+      while (retries >= 0) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{
+              parts: [
+                { text: "Analyze this image according to your system instructions and return the JSON." },
+                { inline_data: { mime_type: "image/jpeg", data: base64Img } }
+              ]
+            }],
+            generationConfig: {
+              response_mime_type: "application/json"
+            }
+          })
+        });
 
-      diagnostics.apiStatus = response.status;
+        diagnostics.apiStatus = response.status;
+
+        // If 503 High Demand, and we have retries left, wait and retry
+        if (response.status === 503 && retries > 0) {
+          retries--;
+          // Wait 2 seconds before retrying
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        
+        // Break out of loop if not 503 or no retries left
+        break;
+      }
+      
+      if (!response) {
+        throw new Error("Failed to execute API request");
+      }
 
       if (!response.ok) {
         let errorBody = '';
