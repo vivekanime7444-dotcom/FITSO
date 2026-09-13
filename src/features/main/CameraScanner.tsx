@@ -135,11 +135,20 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
 
           {diagnostics ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div><span style={{ color: 'var(--text-dim)' }}>Scan ID:</span> {diagnostics.scanId}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Image captured:</span> YES</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Image sent to API:</span> {diagnostics.imageSent ? 'YES' : 'NO'}</div>
-              <div><span style={{ color: 'var(--text-dim)' }}>API Error:</span> <span style={{ color: 'var(--accent-alert)' }}>{diagnostics.error || 'NONE'}</span></div>
-              <div><span style={{ color: 'var(--text-dim)' }}>Food detected:</span> {diagnostics.foodDetected ? 'TRUE' : 'FALSE'}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>SCAN ID:</span> {diagnostics.scanId}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Camera capture:</span> {diagnostics.cameraCapture}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image created:</span> {diagnostics.imageCreated}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image size:</span> {diagnostics.imageSize}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image type:</span> {diagnostics.imageType}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Image sent to API:</span> {diagnostics.imageSent}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>API request:</span> {diagnostics.apiRequest}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>API status:</span> {diagnostics.apiStatus}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Vision response received:</span> {diagnostics.visionResponseReceived}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Raw AI response available:</span> {diagnostics.rawResponseAvailable}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Response parsing:</span> {diagnostics.responseParsing}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Food detection result:</span> {diagnostics.foodDetectionResult}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Final result:</span> {diagnostics.finalResult}</div>
+              <div><span style={{ color: 'var(--text-dim)' }}>Error:</span> <span style={{ color: 'var(--accent-alert)' }}>{diagnostics.error || 'NONE'}</span></div>
               
               {diagnostics.rawResponse && (
                 <div style={{ marginTop: '8px' }}>
