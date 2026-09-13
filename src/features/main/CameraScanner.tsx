@@ -18,7 +18,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<AIAnalysisResult['diagnostics'] | null>(null);
   const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
-  const [modelName, setModelName] = useState(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-1.5-flash-latest');
+  const [modelName, setModelName] = useState(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-flash-latest');
 
   const saveApiKey = (key: string) => {
     setApiKey(key);

@@ -64,7 +64,7 @@ export class NutritionService {
   /**
    * Sends image to real Gemini Vision API
    */
-  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, modelName: string = 'gemini-1.5-flash'): Promise<AIAnalysisResult> {
+  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, modelName: string = 'gemini-flash-latest'): Promise<AIAnalysisResult> {
     const diagnostics: AIAnalysisResult['diagnostics'] = {
       scanId,
       cameraCapture: 'PASS',
