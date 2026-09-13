@@ -69,7 +69,7 @@ export class NutritionService {
   /**
    * Sends image to selected AI Provider
    */
-  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, aiProvider: 'gemini' | 'openai' | 'anthropic' = 'gemini', modelName: string = 'gemini-flash-latest'): Promise<AIAnalysisResult> {
+  public static async analyzeFoodImage(base64DataUrl: string, scanId: string, aiProvider: 'gemini' | 'openai' | 'anthropic' | 'openrouter' = 'gemini', modelName: string = 'gemini-flash-latest'): Promise<AIAnalysisResult> {
     const diagnostics: AIAnalysisResult['diagnostics'] = {
       scanId,
       cameraCapture: 'PASS',
@@ -91,6 +91,7 @@ export class NutritionService {
     if (aiProvider === 'gemini') apiKey = localStorage.getItem('GEMINI_API_KEY') || '';
     if (aiProvider === 'openai') apiKey = localStorage.getItem('OPENAI_API_KEY') || '';
     if (aiProvider === 'anthropic') apiKey = localStorage.getItem('ANTHROPIC_API_KEY') || '';
+    if (aiProvider === 'openrouter') apiKey = localStorage.getItem('OPENROUTER_API_KEY') || '';
     apiKey = apiKey.trim();
 
     if (!apiKey) {
@@ -112,6 +113,8 @@ export class NutritionService {
         jsonStr = await this.fetchOpenAI(apiKey, modelName, base64DataUrl, diagnostics);
       } else if (aiProvider === 'anthropic') {
         jsonStr = await this.fetchAnthropic(apiKey, modelName, base64Img, diagnostics);
+      } else if (aiProvider === 'openrouter') {
+        jsonStr = await this.fetchOpenRouter(apiKey, modelName, base64DataUrl, diagnostics);
       }
 
       // Robust JSON extraction
@@ -319,6 +322,49 @@ export class NutritionService {
 
     const jsonStr = data.content?.[0]?.text;
     if (!jsonStr) throw new Error("No text response from Anthropic API");
+    return jsonStr;
+  }
+
+  private static async fetchOpenRouter(apiKey: string, modelName: string, base64DataUrl: string, diagnostics: any): Promise<string> {
+    const url = 'https://openrouter.ai/api/v1/chat/completions';
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://fitso.ai',
+        'X-Title': 'FITSO Universal Scanner'
+      },
+      body: JSON.stringify({
+        model: modelName,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: [
+            { type: "text", text: "Analyze this image and return the JSON." },
+            { type: "image_url", image_url: { url: base64DataUrl } }
+          ]}
+        ]
+      })
+    });
+
+    diagnostics.apiStatus = response.status;
+
+    if (!response.ok) {
+      let errorBody = await response.text();
+      diagnostics.rawResponse = errorBody;
+      diagnostics.rawResponseAvailable = 'YES (ERROR)';
+      throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
+    }
+
+    diagnostics.visionResponseReceived = 'PASS';
+    const data = await response.json();
+    diagnostics.rawResponse = data;
+    diagnostics.rawResponseAvailable = 'YES';
+
+    const jsonStr = data.choices?.[0]?.message?.content;
+    if (!jsonStr) throw new Error("No text response from OpenRouter API");
     return jsonStr;
   }
 

@@ -18,15 +18,16 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [diagnostics, setDiagnostics] = useState<AIAnalysisResult['diagnostics'] | null>(null);
   
-  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'anthropic'>(
+  const [aiProvider, setAiProvider] = useState<'gemini' | 'openai' | 'anthropic' | 'openrouter'>(
     (localStorage.getItem('AI_PROVIDER') as any) || 'gemini'
   );
   const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
   const [openAiKey, setOpenAiKey] = useState(localStorage.getItem('OPENAI_API_KEY') || '');
   const [anthropicKey, setAnthropicKey] = useState(localStorage.getItem('ANTHROPIC_API_KEY') || '');
+  const [openRouterKey, setOpenRouterKey] = useState(localStorage.getItem('OPENROUTER_API_KEY') || '');
   const [modelName, setModelName] = useState(localStorage.getItem('GEMINI_MODEL_NAME') || 'gemini-flash-latest');
 
-  const saveAiProvider = (provider: 'gemini' | 'openai' | 'anthropic') => {
+  const saveAiProvider = (provider: 'gemini' | 'openai' | 'anthropic' | 'openrouter') => {
     setAiProvider(provider);
     localStorage.setItem('AI_PROVIDER', provider);
     
@@ -37,6 +38,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
       setModelName(localStorage.getItem('OPENAI_MODEL_NAME') || 'gpt-4o');
     } else if (provider === 'anthropic') {
       setModelName(localStorage.getItem('ANTHROPIC_MODEL_NAME') || 'claude-3-5-sonnet-20241022');
+    } else if (provider === 'openrouter') {
+      setModelName(localStorage.getItem('OPENROUTER_MODEL_NAME') || 'meta-llama/llama-3.2-90b-vision-instruct');
     }
   };
 
@@ -55,11 +58,17 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
     localStorage.setItem('ANTHROPIC_API_KEY', key);
   };
 
+  const saveOpenRouterKey = (key: string) => {
+    setOpenRouterKey(key);
+    localStorage.setItem('OPENROUTER_API_KEY', key);
+  };
+
   const saveModelName = (name: string) => {
     setModelName(name);
     if (aiProvider === 'gemini') localStorage.setItem('GEMINI_MODEL_NAME', name);
     if (aiProvider === 'openai') localStorage.setItem('OPENAI_MODEL_NAME', name);
     if (aiProvider === 'anthropic') localStorage.setItem('ANTHROPIC_MODEL_NAME', name);
+    if (aiProvider === 'openrouter') localStorage.setItem('OPENROUTER_MODEL_NAME', name);
   };
   
   useEffect(() => {
@@ -170,6 +179,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
               <option value="gemini">Google Gemini</option>
               <option value="openai">OpenAI (GPT-4o)</option>
               <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openrouter">OpenRouter</option>
             </select>
           </div>
 
@@ -199,6 +209,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
                 value={anthropicKey} 
                 onChange={(e) => saveAnthropicKey(e.target.value)} 
                 placeholder="Paste Anthropic API Key here (sk-ant-...)"
+                style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
+              />
+            )}
+            {aiProvider === 'openrouter' && (
+              <input 
+                type="password" 
+                value={openRouterKey} 
+                onChange={(e) => saveOpenRouterKey(e.target.value)} 
+                placeholder="Paste OpenRouter API Key here (sk-or-v1-...)"
                 style={{ width: '100%', padding: '8px', background: 'var(--surface-bg)', color: '#fff', border: '1px solid var(--border-accent)', borderRadius: '4px' }}
               />
             )}
