@@ -82,7 +82,9 @@ export class NutritionService {
       error: ''
     };
 
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    const rawApiKey = localStorage.getItem('GEMINI_API_KEY');
+    const apiKey = rawApiKey ? rawApiKey.trim() : null;
+
     if (!apiKey) {
       diagnostics.error = 'API_KEY_MISSING';
       diagnostics.finalResult = 'SCAN FAILED';
@@ -99,7 +101,7 @@ export class NutritionService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: { parts: { text: SYSTEM_PROMPT } },
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{
             parts: [
               { text: "Analyze this image according to your system instructions and return the JSON." },
@@ -115,7 +117,16 @@ export class NutritionService {
       diagnostics.apiStatus = response.status;
 
       if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
+        let errorBody = '';
+        try {
+           const errJson = await response.json();
+           errorBody = JSON.stringify(errJson);
+        } catch (e) {
+           errorBody = await response.text();
+        }
+        diagnostics.rawResponse = errorBody;
+        diagnostics.rawResponseAvailable = 'YES (ERROR)';
+        throw new Error(`API returned ${response.status}: ${errorBody.substring(0, 100)}...`);
       }
 
       diagnostics.visionResponseReceived = 'PASS';
