@@ -1,4 +1,5 @@
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
+import { SkeletonVisualizationMapper } from './SkeletonVisualizationMapper';
 
 export class PoseDetectionService {
   private static instance: PoseDetectionService;
@@ -10,6 +11,7 @@ export class PoseDetectionService {
   private canvasElement: HTMLCanvasElement | null = null;
   private drawingUtils: DrawingUtils | null = null;
   private activeRequestAnimationFrame: number | null = null;
+  private visualMapper = new SkeletonVisualizationMapper();
   
   // Callback when a new pose is detected
   public onPoseDetected: ((result: any, videoWidth: number, videoHeight: number) => void) | null = null;
@@ -112,44 +114,79 @@ export class PoseDetectionService {
           if (ctx && this.drawingUtils) {
             ctx.save();
             ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
-            if (results.landmarks && results.landmarks.length > 0) {
-              for (const landmark of results.landmarks) {
-                // We do not draw standard connections here because we want confidence-aware drawing.
-                // Drawing connections manually for high-confidence joints
-                this.drawingUtils.drawLandmarks(landmark.filter((l: any) => l.visibility > 0.4), {
-                  radius: (data) => DrawingUtils.lerp(data.from!.z, -0.15, 0.1, 5, 1),
-                  color: 'rgba(0, 255, 255, 0.8)'
-                });
-                
-                // Confident-aware connections
-                const confidentConnect = (idx1: number, idx2: number) => {
-                  const p1 = landmark[idx1];
-                  const p2 = landmark[idx2];
-                  if (p1 && p2 && p1.visibility > 0.4 && p2.visibility > 0.4) {
-                    const ctx = this.canvasElement!.getContext("2d");
-                    if (!ctx) return;
-                    ctx.beginPath();
-                    ctx.moveTo(p1.x * this.canvasElement!.width, p1.y * this.canvasElement!.height);
-                    ctx.lineTo(p2.x * this.canvasElement!.width, p2.y * this.canvasElement!.height);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                  }
-                };
+                // Get the simple skeleton data
+                const simpleSkeleton = this.visualMapper.map(results.landmarks[0]);
+                if (simpleSkeleton) {
+                  const ctx = this.canvasElement!.getContext("2d");
+                  if (ctx) {
+                    const width = this.canvasElement!.width;
+                    const height = this.canvasElement!.height;
 
-                // Draw essential skeleton
-                // Shoulders
-                confidentConnect(11, 12);
-                // Arms
-                confidentConnect(11, 13); confidentConnect(13, 15);
-                confidentConnect(12, 14); confidentConnect(14, 16);
-                // Torso
-                confidentConnect(11, 23); confidentConnect(12, 24); confidentConnect(23, 24);
-                // Legs
-                confidentConnect(23, 25); confidentConnect(25, 27);
-                confidentConnect(24, 26); confidentConnect(26, 28);
-              }
-            }
+                    const drawPoint = (point: any) => {
+                      if (!point || point.visibility < 0.4) return;
+                      ctx.beginPath();
+                      ctx.arc(point.x * width, point.y * height, 4, 0, 2 * Math.PI);
+                      ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
+                      ctx.fill();
+                      // Optional glow
+                      ctx.shadowBlur = 10;
+                      ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
+                      ctx.fill();
+                      ctx.shadowBlur = 0; // reset
+                    };
+
+                    const drawLine = (p1: any, p2: any) => {
+                      if (!p1 || !p2 || p1.visibility < 0.4 || p2.visibility < 0.4) return;
+                      ctx.beginPath();
+                      ctx.moveTo(p1.x * width, p1.y * height);
+                      ctx.lineTo(p2.x * width, p2.y * height);
+                      ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                      ctx.lineWidth = 2;
+                      ctx.stroke();
+                    };
+
+                    // Draw connections
+                    drawLine(simpleSkeleton.head, simpleSkeleton.neck);
+                    
+                    drawLine(simpleSkeleton.neck, simpleSkeleton.leftShoulder);
+                    drawLine(simpleSkeleton.neck, simpleSkeleton.rightShoulder);
+                    
+                    drawLine(simpleSkeleton.leftShoulder, simpleSkeleton.leftElbow);
+                    drawLine(simpleSkeleton.leftElbow, simpleSkeleton.leftWrist);
+                    
+                    drawLine(simpleSkeleton.rightShoulder, simpleSkeleton.rightElbow);
+                    drawLine(simpleSkeleton.rightElbow, simpleSkeleton.rightWrist);
+                    
+                    drawLine(simpleSkeleton.neck, simpleSkeleton.torso);
+                    drawLine(simpleSkeleton.torso, simpleSkeleton.waist);
+                    
+                    drawLine(simpleSkeleton.waist, simpleSkeleton.leftHip);
+                    drawLine(simpleSkeleton.waist, simpleSkeleton.rightHip);
+                    
+                    drawLine(simpleSkeleton.leftHip, simpleSkeleton.leftKnee);
+                    drawLine(simpleSkeleton.leftKnee, simpleSkeleton.leftAnkle);
+                    drawLine(simpleSkeleton.leftAnkle, simpleSkeleton.leftFoot);
+                    
+                    drawLine(simpleSkeleton.rightHip, simpleSkeleton.rightKnee);
+                    drawLine(simpleSkeleton.rightKnee, simpleSkeleton.rightAnkle);
+                    drawLine(simpleSkeleton.rightAnkle, simpleSkeleton.rightFoot);
+
+                    // Draw points on top of lines
+                    const points = [
+                      simpleSkeleton.head, simpleSkeleton.neck,
+                      simpleSkeleton.leftShoulder, simpleSkeleton.rightShoulder,
+                      simpleSkeleton.leftElbow, simpleSkeleton.rightElbow,
+                      simpleSkeleton.leftWrist, simpleSkeleton.rightWrist,
+                      simpleSkeleton.torso, simpleSkeleton.waist,
+                      simpleSkeleton.leftHip, simpleSkeleton.rightHip,
+                      simpleSkeleton.leftKnee, simpleSkeleton.rightKnee,
+                      simpleSkeleton.leftAnkle, simpleSkeleton.rightAnkle,
+                      simpleSkeleton.leftFoot, simpleSkeleton.rightFoot
+                    ];
+                    
+                    points.forEach(p => drawPoint(p));
+                  }
+                }
             ctx.restore();
           }
 
