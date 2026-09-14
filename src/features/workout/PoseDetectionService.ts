@@ -1,15 +1,14 @@
-import { PoseLandmarker, FilesetResolver, DrawingUtils } from '@mediapipe/tasks-vision';
+import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { SkeletonVisualizationMapper } from './SkeletonVisualizationMapper';
 
 export class PoseDetectionService {
   private static instance: PoseDetectionService;
   private poseLandmarker: PoseLandmarker | null = null;
   private isInitialized = false;
-  private isInitializing = false;
+  private initPromise: Promise<void> | null = null;
   private cameraStream: MediaStream | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private canvasElement: HTMLCanvasElement | null = null;
-  private drawingUtils: DrawingUtils | null = null;
   private activeRequestAnimationFrame: number | null = null;
   private visualMapper = new SkeletonVisualizationMapper();
   
@@ -26,51 +25,62 @@ export class PoseDetectionService {
   }
 
   public async initialize(): Promise<void> {
-    if (this.isInitialized || this.isInitializing) return;
-    this.isInitializing = true;
+    if (this.isInitialized) return;
+    if (this.initPromise) return this.initPromise;
 
-    try {
-      const vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
-      );
-      
-      this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numPoses: 1,
-        minPoseDetectionConfidence: 0.5,
-        minPosePresenceConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
+    this.initPromise = (async () => {
+      try {
+        const vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm"
+        );
+        
+        this.poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task`,
+            delegate: "GPU"
+          },
+          runningMode: "VIDEO",
+          numPoses: 1,
+          minPoseDetectionConfidence: 0.5,
+          minPosePresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
 
-      this.isInitialized = true;
-      console.log("PoseLandmarker initialized successfully");
-    } catch (error) {
-      console.error("Failed to initialize PoseLandmarker", error);
-    } finally {
-      this.isInitializing = false;
-    }
+        this.isInitialized = true;
+        console.log("PoseLandmarker initialized successfully");
+      } catch (error) {
+        console.error("Failed to initialize PoseLandmarker", error);
+        this.initPromise = null; // Allow retry on failure
+        throw error;
+      }
+    })();
+
+    return this.initPromise;
   }
 
   public async startCamera(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> {
+    this.stopCamera(); // Ensure clean state before starting
+
     this.videoElement = video;
     this.canvasElement = canvas;
-    
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      this.drawingUtils = new DrawingUtils(ctx);
-    }
 
     try {
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480 }
+        video: { facingMode: "user", width: 640, height: 480, frameRate: { ideal: 30 } }
       });
+      
+      // If stopCamera was called while waiting for permission, abort safely
+      if (!this.videoElement) {
+        this.cameraStream.getTracks().forEach(t => t.stop());
+        this.cameraStream = null;
+        return;
+      }
+
       video.srcObject = this.cameraStream;
+      // Prevent multiple listeners
+      video.removeEventListener("loadeddata", this.predictWebcam);
       video.addEventListener("loadeddata", this.predictWebcam);
-      video.play();
+      await video.play();
     } catch (err) {
       console.error("Camera access denied or unavailable", err);
       throw err;
@@ -85,6 +95,12 @@ export class PoseDetectionService {
     if (this.videoElement) {
       this.videoElement.removeEventListener("loadeddata", this.predictWebcam);
       this.videoElement.srcObject = null;
+      this.videoElement = null;
+    }
+    if (this.canvasElement) {
+       const ctx = this.canvasElement.getContext("2d");
+       if (ctx) ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+       this.canvasElement = null;
     }
     if (this.activeRequestAnimationFrame !== null) {
       cancelAnimationFrame(this.activeRequestAnimationFrame);
@@ -93,13 +109,17 @@ export class PoseDetectionService {
   }
 
   private predictWebcam = async () => {
-    if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) return;
+    if (this.activeRequestAnimationFrame !== null) return; // Prevent multiple loops
 
     let lastVideoTime = -1;
     let lastAnalysisTime = 0;
     
     const detect = async () => {
-      if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) return;
+      // If stopped or not ready, exit loop cleanly
+      if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) {
+        this.activeRequestAnimationFrame = null;
+        return;
+      }
 
       const now = performance.now();
       // Throttle analysis to ~30 FPS (33ms) to prevent blocking main thread too much
@@ -111,16 +131,16 @@ export class PoseDetectionService {
           const results = this.poseLandmarker.detectForVideo(this.videoElement, performance.now());
           
           const ctx = this.canvasElement.getContext("2d");
-          if (ctx && this.drawingUtils) {
+          if (ctx) {
             ctx.save();
             ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
+            
+            if (results.landmarks && results.landmarks.length > 0) {
                 // Get the simple skeleton data
                 const simpleSkeleton = this.visualMapper.map(results.landmarks[0]);
                 if (simpleSkeleton) {
-                  const ctx = this.canvasElement!.getContext("2d");
-                  if (ctx) {
-                    const width = this.canvasElement!.width;
-                    const height = this.canvasElement!.height;
+                    const width = this.canvasElement.width;
+                    const height = this.canvasElement.height;
 
                     const drawPoint = (point: any) => {
                       if (!point || point.visibility < 0.4) return;
@@ -185,8 +205,8 @@ export class PoseDetectionService {
                     ];
                     
                     points.forEach(p => drawPoint(p));
-                  }
                 }
+            }
             ctx.restore();
           }
 
