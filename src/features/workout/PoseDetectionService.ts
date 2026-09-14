@@ -94,11 +94,15 @@ export class PoseDetectionService {
     if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) return;
 
     let lastVideoTime = -1;
+    let lastAnalysisTime = 0;
     
     const detect = async () => {
       if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) return;
 
-      if (this.videoElement.currentTime !== lastVideoTime) {
+      const now = performance.now();
+      // Throttle analysis to ~30 FPS (33ms) to prevent blocking main thread too much
+      if (now - lastAnalysisTime >= 33 && this.videoElement.currentTime !== lastVideoTime) {
+        lastAnalysisTime = now;
         lastVideoTime = this.videoElement.currentTime;
         
         try {

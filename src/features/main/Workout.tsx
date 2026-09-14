@@ -165,9 +165,24 @@ export const Workout: React.FC = () => {
           }
         };
 
+        let lastReportedState = engine['currentState'];
+        let lastReportedReps = 0;
+        let lastUiUpdateTime = 0;
+
         poseService.onPoseDetected = (result) => {
           const res = engine.processPose(result);
-          setAnalysisResult(res);
+          
+          const now = performance.now();
+          const stateChanged = res.state !== lastReportedState;
+          const repsChanged = res.reps !== lastReportedReps;
+          const timeToUpdate = now - lastUiUpdateTime > 500; // Update UI max twice a second for confidence/posture
+          
+          if (stateChanged || repsChanged || timeToUpdate) {
+             lastReportedState = res.state;
+             lastReportedReps = res.reps;
+             lastUiUpdateTime = now;
+             setAnalysisResult(res);
+          }
         };
 
         poseService.startCamera(videoRef.current, canvasRef.current).catch(err => {
@@ -568,13 +583,14 @@ export const Workout: React.FC = () => {
             {/* Tracking Status Overlay */}
             <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '8px' }}>
               <div style={{ background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>
-                AI TRACKING {analysisResult?.confidence > 0.4 ? 'ACTIVE' : 'PAUSED'}
+                {analysisResult?.state === 'NOT_READY' ? 'WAITING FOR POSITION' : 'TRACKING ACTIVE'}
               </div>
             </div>
 
             {/* Diagnostics overlay (dev mode hidden normally, but we show basic info) */}
             <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', padding: '8px', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--text-dim)', textAlign: 'right' }}>
-              <div>STATE: {analysisResult?.state || 'IDLE'}</div>
+              <div>POSTURE: {analysisResult?.posture || 'UNKNOWN'}</div>
+              <div>STATE: {analysisResult?.state || 'NOT_READY'}</div>
               <div>CONF: {Math.round((analysisResult?.confidence || 0) * 100)}%</div>
             </div>
           </div>

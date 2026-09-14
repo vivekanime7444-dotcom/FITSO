@@ -1,24 +1,29 @@
-import { SystemVoiceService } from './SystemVoiceService';
 import { HapticService } from './HapticService';
+import { LandmarkSmoother, TemporalValidator } from './TemporalFilter';
+import { PostureValidator, type PostureState } from './PostureValidator';
 
-export type RepState = 'IDLE' | 'READY' | 'DOWN' | 'UP' | 'REP_COMPLETE';
+export type RepState = 'NOT_READY' | 'READY' | 'DESCENDING' | 'BOTTOM_CONFIRMED' | 'ASCENDING' | 'TOP_CONFIRMED' | 'REP_COMPLETE';
 
 export interface AnalysisResult {
   state: RepState;
   reps: number;
   feedback: string | null;
   confidence: number;
+  posture: PostureState;
 }
 
 export class ExerciseAnalysisEngine {
   private static instance: ExerciseAnalysisEngine;
   
-  private currentState: RepState = 'IDLE';
+  private currentState: RepState = 'NOT_READY';
   private currentReps = 0;
   private currentExercise: string = '';
   
-  private lastFeedbackTime = 0;
-  private feedbackCooldown = 3000; // ms
+  // Smoothing and Validation
+  private smoother = new LandmarkSmoother(0.2); // Heavy smoothing
+  private positionValidator = new TemporalValidator(1000); // Must hold READY for 1 second
+  private bottomValidator = new TemporalValidator(200);    // Must hold BOTTOM for 200ms
+  private topValidator = new TemporalValidator(200);       // Must hold TOP for 200ms
   
   // Callbacks
   public onRepComplete: ((reps: number) => void) | null = null;
@@ -36,51 +41,55 @@ export class ExerciseAnalysisEngine {
   public startExercise(exerciseName: string, _targetReps: number) {
     this.currentExercise = exerciseName.toLowerCase();
     this.currentReps = 0;
-    this.currentState = 'IDLE';
-    this.lastFeedbackTime = 0;
-    this.emitState('IDLE');
+    this.currentState = 'NOT_READY';
+    this.smoother.reset();
+    this.positionValidator.reset();
+    this.bottomValidator.reset();
+    this.topValidator.reset();
+    this.emitState('NOT_READY');
   }
 
   public processPose(poseResult: any): AnalysisResult {
     if (!poseResult || !poseResult.landmarks || poseResult.landmarks.length === 0) {
-      return { state: this.currentState, reps: this.currentReps, feedback: null, confidence: 0 };
+      this.positionValidator.reset();
+      this.changeState('NOT_READY');
+      return { state: this.currentState, reps: this.currentReps, feedback: null, confidence: 0, posture: 'UNKNOWN' };
     }
 
-    const landmarks = poseResult.landmarks[0];
+    const rawLandmarks = poseResult.landmarks[0];
+    const confidence = this.calculateTrackingConfidence(rawLandmarks);
     
-    // Default confidence based on visibility of key points (hips, shoulders, knees)
-    const confidence = this.calculateTrackingConfidence(landmarks);
-    if (confidence < 0.4) {
-      return { state: this.currentState, reps: this.currentReps, feedback: null, confidence };
+    if (confidence < 0.5) {
+      this.positionValidator.reset();
+      // Don't change state immediately, but tracking is poor. We stay in current state but don't advance.
+      return { state: this.currentState, reps: this.currentReps, feedback: null, confidence, posture: 'UNKNOWN' };
     }
+
+    const smoothed = this.smoother.smooth(rawLandmarks);
+    const posture = PostureValidator.classifyPosture(smoothed);
 
     let feedback: string | null = null;
 
-    // Route to specific exercise logic
     if (this.currentExercise.includes('push-up')) {
-      feedback = this.analyzePushup(landmarks);
-    } else if (this.currentExercise.includes('squat')) {
-      feedback = this.analyzeSquat(landmarks);
-    } else if (this.currentExercise.includes('lunge')) {
-      feedback = this.analyzeLunge(landmarks);
-    } else if (this.currentExercise.includes('curl')) {
-      feedback = this.analyzeBicepCurl(landmarks);
+      feedback = this.analyzePushup(smoothed);
     } else {
-      // Unsupported exercise, we stay IDLE.
-      this.changeState('IDLE');
+      // Temporarily disable other exercises
+      this.changeState('NOT_READY');
+      feedback = "Exercise not supported yet in Phase 6 core fix.";
     }
 
     return {
       state: this.currentState,
       reps: this.currentReps,
       feedback,
-      confidence
+      confidence,
+      posture
     };
   }
 
   private calculateTrackingConfidence(landmarks: any[]): number {
     let visible = 0;
-    const required = [11, 12, 23, 24]; // Shoulders and hips usually needed
+    const required = [11, 12, 13, 14, 15, 16, 23, 24]; // Shoulders, elbows, wrists, hips
     for (const idx of required) {
       if (landmarks[idx] && (landmarks[idx].visibility || 1) > 0.5) visible++;
     }
@@ -105,66 +114,21 @@ export class ExerciseAnalysisEngine {
     if (this.onStateChange) this.onStateChange(state);
   }
 
-  private provideFeedback(msg: string) {
-    const now = Date.now();
-    if (now - this.lastFeedbackTime > this.feedbackCooldown) {
-      this.lastFeedbackTime = now;
-      SystemVoiceService.announceCustom(msg);
-      return msg;
-    }
-    return null;
-  }
-
-  // === EXERCISE SPECIFIC LOGIC ===
-
-  private analyzeSquat(landmarks: any[]): string | null {
-    // MediaPipe landmarks: 23=L hip, 25=L knee, 27=L ankle
-    const hip = landmarks[23];
-    const knee = landmarks[25];
-    const ankle = landmarks[27];
-    const shoulder = landmarks[11];
-
-    if (!hip || !knee || !ankle || !shoulder) return null;
-
-    const kneeAngle = this.calculateAngle(hip, knee, ankle);
-    const backAngle = this.calculateAngle(shoulder, hip, knee);
-
-    if (this.currentState === 'IDLE' || this.currentState === 'REP_COMPLETE') {
-      if (kneeAngle > 160) this.changeState('READY');
-    }
-
-    if (this.currentState === 'READY' || this.currentState === 'UP') {
-      if (kneeAngle < 140 && kneeAngle > 100) {
-        this.changeState('DOWN');
-      } else if (kneeAngle <= 100) {
-        // Deep enough
-        this.changeState('DOWN');
-      }
-    }
-
-    if (this.currentState === 'DOWN') {
-      if (kneeAngle <= 100) {
-        // Good depth
-        if (backAngle < 50) {
-          return this.provideFeedback("Keep your chest up");
-        }
-      }
-      
-      if (kneeAngle > 150) {
-        // Came back up
-        // Did they go deep enough? We should technically track max depth, but for simplicity:
-        this.currentReps++;
-        this.changeState('REP_COMPLETE');
-        HapticService.selection();
-        if (this.onRepComplete) this.onRepComplete(this.currentReps);
-      }
-    }
-
-    return null;
-  }
+  // === STRICT PUSH-UP STATE MACHINE ===
 
   private analyzePushup(landmarks: any[]): string | null {
-    // 11=L shoulder, 13=L elbow, 15=L wrist
+    // Requirements for Push-up:
+    // 1. Must be HORIZONTAL and valid.
+    const isPostureValid = PostureValidator.isReadyForPushUp(landmarks);
+    const isReady = this.positionValidator.validate(isPostureValid ? 'VALID' : 'INVALID');
+
+    if (!isReady) {
+      this.changeState('NOT_READY');
+      this.bottomValidator.reset();
+      this.topValidator.reset();
+      return null;
+    }
+
     const shoulder = landmarks[11];
     const elbow = landmarks[13];
     const wrist = landmarks[15];
@@ -173,58 +137,70 @@ export class ExerciseAnalysisEngine {
 
     const elbowAngle = this.calculateAngle(shoulder, elbow, wrist);
 
-    if (this.currentState === 'IDLE' || this.currentState === 'REP_COMPLETE') {
-      if (elbowAngle > 150) this.changeState('READY');
-    }
+    switch (this.currentState) {
+      case 'NOT_READY':
+      case 'REP_COMPLETE':
+        // Transition to READY if angle is high (arms extended)
+        if (elbowAngle > 150) {
+          this.changeState('READY');
+        }
+        break;
 
-    if (this.currentState === 'READY' || this.currentState === 'UP') {
-      if (elbowAngle < 140) {
-        this.changeState('DOWN');
-      }
-    }
+      case 'READY':
+        // Start descending
+        if (elbowAngle < 140) {
+          this.changeState('DESCENDING');
+        }
+        break;
 
-    if (this.currentState === 'DOWN') {
-      if (elbowAngle <= 90) {
-        // Good depth
-      }
-      
-      if (elbowAngle > 150) {
+      case 'DESCENDING':
+        // Validate BOTTOM
+        if (elbowAngle <= 90) {
+          const isBottomConfirmed = this.bottomValidator.validate('BOTTOM');
+          if (isBottomConfirmed) {
+            this.changeState('BOTTOM_CONFIRMED');
+          }
+        } else {
+          this.bottomValidator.reset();
+          // If they go back up without hitting 90, they failed the rep. Return to READY.
+          if (elbowAngle > 150) {
+            this.changeState('READY');
+          }
+        }
+        break;
+
+      case 'BOTTOM_CONFIRMED':
+        // Start ascending
+        if (elbowAngle > 100) {
+          this.changeState('ASCENDING');
+        }
+        break;
+
+      case 'ASCENDING':
+        // Validate TOP
+        if (elbowAngle > 150) {
+          const isTopConfirmed = this.topValidator.validate('TOP');
+          if (isTopConfirmed) {
+            this.changeState('TOP_CONFIRMED');
+          }
+        } else {
+          this.topValidator.reset();
+          // If they go back down before hitting top, they failed the ascent.
+          if (elbowAngle < 100) {
+            this.changeState('DESCENDING');
+          }
+        }
+        break;
+
+      case 'TOP_CONFIRMED':
+        // Only here can we increment the rep
         this.currentReps++;
         this.changeState('REP_COMPLETE');
         HapticService.selection();
         if (this.onRepComplete) this.onRepComplete(this.currentReps);
-      }
+        break;
     }
 
-    return null;
-  }
-
-  private analyzeLunge(landmarks: any[]): string | null {
-    // Simplified logic
-    return this.analyzeSquat(landmarks);
-  }
-
-  private analyzeBicepCurl(landmarks: any[]): string | null {
-    const shoulder = landmarks[11];
-    const elbow = landmarks[13];
-    const wrist = landmarks[15];
-    if (!shoulder || !elbow || !wrist) return null;
-    const elbowAngle = this.calculateAngle(shoulder, elbow, wrist);
-
-    if (this.currentState === 'IDLE' || this.currentState === 'REP_COMPLETE') {
-      if (elbowAngle > 150) this.changeState('READY');
-    }
-    if (this.currentState === 'READY' || this.currentState === 'DOWN') {
-      if (elbowAngle < 60) this.changeState('UP');
-    }
-    if (this.currentState === 'UP') {
-      if (elbowAngle > 150) {
-        this.currentReps++;
-        this.changeState('REP_COMPLETE');
-        HapticService.selection();
-        if (this.onRepComplete) this.onRepComplete(this.currentReps);
-      }
-    }
     return null;
   }
 }
