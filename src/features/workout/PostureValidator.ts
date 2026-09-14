@@ -1,73 +1,66 @@
+import type { SkeletonFrame } from './SkeletonMapper';
+
 export type PostureState = 'STANDING' | 'SITTING' | 'HORIZONTAL' | 'UNKNOWN';
 
 export class PostureValidator {
   
-  public static classifyPosture(landmarks: any[]): PostureState {
-    if (!landmarks || landmarks.length === 0) return 'UNKNOWN';
+  public static classifyPosture(frame: SkeletonFrame): PostureState {
+    const { leftShoulder, rightShoulder, leftHip, rightHip, leftAnkle, rightAnkle } = frame;
     
-    // 11/12 Shoulders, 23/24 Hips, 27/28 Ankles
-    const leftShoulder = landmarks[11];
-    const rightShoulder = landmarks[12];
-    const leftHip = landmarks[23];
-    const rightHip = landmarks[24];
-    const leftAnkle = landmarks[27];
-    const rightAnkle = landmarks[28];
+    // We need at least one shoulder and one hip to make basic posture guesses
+    const shoulder = leftShoulder && leftShoulder.confidence > 0.4 ? leftShoulder : rightShoulder;
+    const hip = leftHip && leftHip.confidence > 0.4 ? leftHip : rightHip;
 
-    if (!leftShoulder || !leftHip) return 'UNKNOWN';
+    if (!shoulder || !hip) return 'UNKNOWN';
 
-    const shoulderY = (leftShoulder.y + (rightShoulder?.y || leftShoulder.y)) / 2;
-    const hipY = (leftHip.y + (rightHip?.y || leftHip.y)) / 2;
-    
     // In camera coordinates, Y goes DOWN (0 is top, 1 is bottom)
-    // Vertical distance between shoulder and hip
-    const torsoVerticalDistance = Math.abs(hipY - shoulderY);
-    
-    // X goes RIGHT (0 is left, 1 is right)
-    const shoulderX = (leftShoulder.x + (rightShoulder?.x || leftShoulder.x)) / 2;
-    const hipX = (leftHip.x + (rightHip?.x || leftHip.x)) / 2;
-    const torsoHorizontalDistance = Math.abs(hipX - shoulderX);
+    const torsoVerticalDistance = Math.abs(hip.y - shoulder.y);
+    const torsoHorizontalDistance = Math.abs(hip.x - shoulder.x);
 
-    // 1. Check if user is HORIZONTAL (e.g. push-up/plank position)
-    // If the horizontal distance between shoulders and hips is greater than vertical
-    if (torsoHorizontalDistance > torsoVerticalDistance * 1.2) {
+    // 1. Check if user is HORIZONTAL
+    // If the horizontal distance between shoulder and hip is greater than vertical
+    // NOTE: This applies heavily to SIDE profiles. If facing FRONT, the X distance is 0 but Z distance is large.
+    // So let's check Z as well if available.
+    const torsoDepthDistance = Math.abs(hip.z - shoulder.z);
+
+    if (torsoHorizontalDistance > torsoVerticalDistance * 1.2 || torsoDepthDistance > torsoVerticalDistance * 1.5) {
       return 'HORIZONTAL';
     }
 
-    // Otherwise, they are likely upright. Let's distinguish between standing and sitting based on ankles/knees.
-    // If ankles aren't visible or very high confidence, we might default to sitting or unknown.
-    if (leftAnkle && leftAnkle.visibility > 0.5) {
-      const ankleY = (leftAnkle.y + (rightAnkle?.y || leftAnkle.y)) / 2;
-      const legVerticalDistance = Math.abs(ankleY - hipY);
-      
+    // Distinguish standing vs sitting using ankles
+    const ankle = leftAnkle && leftAnkle.confidence > 0.4 ? leftAnkle : rightAnkle;
+    if (ankle) {
+      const legVerticalDistance = Math.abs(ankle.y - hip.y);
       // If legs are long vertically relative to torso, they are standing.
       if (legVerticalDistance > torsoVerticalDistance * 0.8) {
         return 'STANDING';
       } else {
-        // If legs are bent up or very short vertically compared to torso, they are sitting.
         return 'SITTING';
       }
     }
     
-    // If we can't see ankles, but torso is vertical, they are either standing close to camera or sitting.
-    // Without full body context, we lean towards SITTING or UNKNOWN.
-    return 'SITTING'; 
+    return 'SITTING'; // Fallback if no legs visible but upright
   }
 
-  public static isReadyForPushUp(landmarks: any[]): boolean {
-    const posture = this.classifyPosture(landmarks);
+  public static isReadyForPushUp(frame: SkeletonFrame): boolean {
+    const posture = this.classifyPosture(frame);
     if (posture !== 'HORIZONTAL') return false;
 
-    // Further validation for pushup:
-    // Shoulders must be visible and roughly at same height as hips or slightly higher,
-    // and wrists must be below shoulders (higher Y value).
-    const leftShoulder = landmarks[11];
-    const leftWrist = landmarks[15];
+    // Wrist validation
+    const wrist = (frame.leftWrist && frame.leftWrist.confidence > 0.4) ? frame.leftWrist : frame.rightWrist;
+    const shoulder = (frame.leftShoulder && frame.leftShoulder.confidence > 0.4) ? frame.leftShoulder : frame.rightShoulder;
     
-    if (!leftShoulder || !leftWrist) return false;
+    if (!shoulder || !wrist) return false;
     
-    // Wrists should be "below" shoulders in Y coordinate (meaning higher value in image coords)
-    // or at least not way above.
-    if (leftWrist.y < leftShoulder.y - 0.1) return false;
+    // Wrists should be below shoulders in Y coordinate (higher value)
+    if (wrist.y < shoulder.y - 0.1) return false;
+
+    return true;
+  }
+
+  public static isReadyForSquat(frame: SkeletonFrame): boolean {
+    const posture = this.classifyPosture(frame);
+    if (posture !== 'STANDING') return false;
 
     return true;
   }

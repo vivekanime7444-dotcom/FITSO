@@ -582,14 +582,16 @@ export const Workout: React.FC = () => {
             
             {/* Tracking Status Overlay */}
             <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '8px' }}>
-              <div style={{ background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>
-                {analysisResult?.state === 'NOT_READY' ? 'WAITING FOR POSITION' : 'TRACKING ACTIVE'}
+              <div style={{ background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', color: analysisResult?.trackingStatus === 'PAUSED' ? 'var(--accent-red)' : analysisResult?.trackingStatus === 'DEGRADED' ? 'var(--accent-yellow)' : 'var(--accent-cyan)' }}>
+                {analysisResult?.state === 'NOT_READY' ? 'WAITING FOR POSITION' : `TRACKING: ${analysisResult?.trackingStatus || 'UNKNOWN'}`}
               </div>
             </div>
 
             {/* Diagnostics overlay (dev mode hidden normally, but we show basic info) */}
             <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', padding: '8px', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--text-dim)', textAlign: 'right' }}>
+              <div>ORIENT: {analysisResult?.orientation || 'UNKNOWN'}</div>
               <div>POSTURE: {analysisResult?.posture || 'UNKNOWN'}</div>
+              <div>SIDE: {analysisResult?.primarySide || 'BOTH'}</div>
               <div>STATE: {analysisResult?.state || 'NOT_READY'}</div>
               <div>CONF: {Math.round((analysisResult?.confidence || 0) * 100)}%</div>
             </div>

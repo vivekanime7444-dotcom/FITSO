@@ -114,15 +114,40 @@ export class PoseDetectionService {
             ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
             if (results.landmarks && results.landmarks.length > 0) {
               for (const landmark of results.landmarks) {
-                this.drawingUtils.drawLandmarks(landmark, {
+                // We do not draw standard connections here because we want confidence-aware drawing.
+                // Drawing connections manually for high-confidence joints
+                this.drawingUtils.drawLandmarks(landmark.filter((l: any) => l.visibility > 0.4), {
                   radius: (data) => DrawingUtils.lerp(data.from!.z, -0.15, 0.1, 5, 1),
-                  color: "#00F0FF",
-                  lineWidth: 2
+                  color: 'rgba(0, 255, 255, 0.8)'
                 });
-                this.drawingUtils.drawConnectors(landmark, PoseLandmarker.POSE_CONNECTIONS, {
-                  color: "#0088FF",
-                  lineWidth: 3
-                });
+                
+                // Confident-aware connections
+                const confidentConnect = (idx1: number, idx2: number) => {
+                  const p1 = landmark[idx1];
+                  const p2 = landmark[idx2];
+                  if (p1 && p2 && p1.visibility > 0.4 && p2.visibility > 0.4) {
+                    const ctx = this.canvasElement!.getContext("2d");
+                    if (!ctx) return;
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x * this.canvasElement!.width, p1.y * this.canvasElement!.height);
+                    ctx.lineTo(p2.x * this.canvasElement!.width, p2.y * this.canvasElement!.height);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                  }
+                };
+
+                // Draw essential skeleton
+                // Shoulders
+                confidentConnect(11, 12);
+                // Arms
+                confidentConnect(11, 13); confidentConnect(13, 15);
+                confidentConnect(12, 14); confidentConnect(14, 16);
+                // Torso
+                confidentConnect(11, 23); confidentConnect(12, 24); confidentConnect(23, 24);
+                // Legs
+                confidentConnect(23, 25); confidentConnect(25, 27);
+                confidentConnect(24, 26); confidentConnect(26, 28);
               }
             }
             ctx.restore();
