@@ -9,6 +9,7 @@ import { VisibilityEngine } from './VisibilityEngine';
 import type { TrackingStatus } from './VisibilityEngine';
 import { PushUpAnalyzer } from './analyzers/PushUpAnalyzer';
 import { SquatAnalyzer } from './analyzers/SquatAnalyzer';
+import { CurlAnalyzer } from './analyzers/CurlAnalyzer';
 
 export type RepState = 'NOT_READY' | 'READY' | 'DESCENDING' | 'BOTTOM_CONFIRMED' | 'ASCENDING' | 'TOP_CONFIRMED' | 'REP_COMPLETE';
 
@@ -31,10 +32,10 @@ export class ExerciseAnalysisEngine {
   private currentExercise: string = '';
   
   // Smoothing and Validation
-  private smoother = new LandmarkSmoother(0.2); // Heavy smoothing
-  private positionValidator = new TemporalValidator(800);  // Must hold READY for 800ms
-  private bottomValidator = new TemporalValidator(150);    // Must hold BOTTOM for 150ms
-  private topValidator = new TemporalValidator(150);       // Must hold TOP for 150ms
+  private smoother = new LandmarkSmoother(0.25); // Heavy smoothing for stability
+  private positionValidator = new TemporalValidator(1000);  // Must hold READY for 1000ms
+  private bottomValidator = new TemporalValidator(200);    // Strict bottom hold for ROM validation
+  private topValidator = new TemporalValidator(200);       // Strict top hold for ROM validation
   
   // Callbacks
   public onRepComplete: ((reps: number) => void) | null = null;
@@ -102,6 +103,11 @@ export class ExerciseAnalysisEngine {
       trackingStatus = visibility.status;
       primarySide = visibility.primarySide;
       this.analyzeSquat(frame, orientation, visibility);
+    } else if (this.currentExercise.includes('curl')) {
+      const visibility = VisibilityEngine.evaluateCurl(frame);
+      trackingStatus = visibility.status;
+      primarySide = visibility.primarySide;
+      this.analyzeCurl(frame, orientation, visibility);
     } else {
       // Temporarily disable others
       this.changeState('NOT_READY');
@@ -234,6 +240,61 @@ export class ExerciseAnalysisEngine {
         }
         break;
       case 'TOP_CONFIRMED':
+        this.currentReps++;
+        this.changeState('REP_COMPLETE');
+        HapticService.selection();
+        if (this.onRepComplete) this.onRepComplete(this.currentReps);
+        break;
+    }
+  }
+
+  // === MULTI-VIEW CURL ENGINE ===
+  private analyzeCurl(frame: SkeletonFrame, orientation: BodyOrientation, visibility: any) {
+    if (visibility.status === 'PAUSED') return;
+
+    const isPostureValid = PostureValidator.isReadyForCurl(frame);
+    const isReady = this.positionValidator.validate(isPostureValid ? 'VALID' : 'INVALID');
+
+    if (!isReady) {
+      this.changeState('NOT_READY');
+      this.bottomValidator.reset();
+      this.topValidator.reset();
+      return;
+    }
+
+    const metricAngle = CurlAnalyzer.getPrimaryMetric(frame, orientation, visibility);
+    if (metricAngle === null) return;
+
+    // Curl ROM: > 150 = straight arm (bottom), < 50 = fully curled (top)
+    switch (this.currentState) {
+      case 'NOT_READY':
+      case 'REP_COMPLETE':
+        if (metricAngle > 150) this.changeState('READY'); // Arm extended at bottom
+        break;
+      case 'READY':
+        if (metricAngle < 140) this.changeState('ASCENDING'); // Start curling up
+        break;
+      case 'ASCENDING':
+        // Top of curl (50 degrees or lower)
+        if (metricAngle <= 55) {
+          if (this.topValidator.validate('TOP')) this.changeState('TOP_CONFIRMED');
+        } else {
+          this.topValidator.reset();
+          if (metricAngle > 150) this.changeState('READY'); // Aborted curl
+        }
+        break;
+      case 'TOP_CONFIRMED':
+        if (metricAngle > 70) this.changeState('DESCENDING');
+        break;
+      case 'DESCENDING':
+        if (metricAngle > 150) {
+          if (this.bottomValidator.validate('BOTTOM')) this.changeState('BOTTOM_CONFIRMED');
+        } else {
+          this.bottomValidator.reset();
+          if (metricAngle < 70) this.changeState('ASCENDING'); // Bounced back up
+        }
+        break;
+      case 'BOTTOM_CONFIRMED':
         this.currentReps++;
         this.changeState('REP_COMPLETE');
         HapticService.selection();

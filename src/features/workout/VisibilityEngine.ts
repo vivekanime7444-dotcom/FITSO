@@ -22,6 +22,11 @@ export class VisibilityEngine {
     return this.evaluateRequirements(frame, ['Shoulder', 'Elbow', 'Wrist']);
   }
 
+  public static evaluateCurl(frame: SkeletonFrame): VisibilityReport {
+    // Curls Primary: Shoulders, Elbows, Wrists
+    return this.evaluateRequirements(frame, ['Shoulder', 'Elbow', 'Wrist']);
+  }
+
   private static evaluateRequirements(frame: SkeletonFrame, primaryJoints: string[]): VisibilityReport {
     let leftPrimaryScore = 0;
     let rightPrimaryScore = 0;

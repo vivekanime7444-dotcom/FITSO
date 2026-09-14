@@ -64,4 +64,20 @@ export class PostureValidator {
 
     return true;
   }
+
+  public static isReadyForCurl(frame: SkeletonFrame): boolean {
+    const posture = this.classifyPosture(frame);
+    // Curls can be done standing or sitting, but not horizontal
+    if (posture === 'HORIZONTAL' || posture === 'UNKNOWN') return false;
+
+    // Wrist should be below shoulder to start
+    const wrist = (frame.leftWrist && frame.leftWrist.confidence > 0.4) ? frame.leftWrist : frame.rightWrist;
+    const shoulder = (frame.leftShoulder && frame.leftShoulder.confidence > 0.4) ? frame.leftShoulder : frame.rightShoulder;
+    
+    if (shoulder && wrist) {
+      if (wrist.y < shoulder.y) return false;
+    }
+
+    return true;
+  }
 }
