@@ -152,6 +152,14 @@ export class SystemVoiceService {
     this.scheduleSpeech(`Mission complete. Training session recorded.`, delayMs);
   }
 
+  public static announceMissionComplete(delayMs = 0) {
+    this.scheduleSpeech("Mission complete. Excellent work today.", delayMs);
+  }
+
+  public static announceCustom(message: string, delayMs = 0) {
+    this.scheduleSpeech(message, delayMs);
+  }
+
   public static announceFormCorrection(message: string, delayMs = 0) {
     // PREPARED FOR PHASE 3
     this.scheduleSpeech(message, delayMs);

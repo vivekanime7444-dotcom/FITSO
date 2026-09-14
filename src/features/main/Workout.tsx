@@ -10,7 +10,9 @@ import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
 import { SystemVoiceService } from '../workout/SystemVoiceService';
 import { WorkoutSchedulerService } from '../workout/WorkoutSchedulerService';
-import { Play, Check, ChevronRight, Zap, ZapOff, Volume2, VolumeX, BellRing, FastForward, Timer, ShieldAlert } from 'lucide-react';
+import { PoseDetectionService } from '../workout/PoseDetectionService';
+import { ExerciseAnalysisEngine } from '../workout/ExerciseAnalysisEngine';
+import { Play, Check, ChevronRight, Zap, ZapOff, Volume2, VolumeX, BellRing, FastForward, Timer, ShieldAlert, Camera, CameraOff } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
 export const Workout: React.FC = () => {
@@ -25,6 +27,8 @@ export const Workout: React.FC = () => {
     setSoundsEnabled,
     voiceEnabled,
     setVoiceEnabled,
+    cameraEnabled,
+    setCameraEnabled,
     workoutHistory,
     weeklyPlan,
     setWeeklyPlan
@@ -40,6 +44,12 @@ export const Workout: React.FC = () => {
   const [restTimeLeft, setRestTimeLeft] = useState(0);
   const [isResting, setIsResting] = useState(false);
 
+  // Camera tracking state
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const canvasRef = React.useRef<HTMLCanvasElement>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isTrackingReady, setIsTrackingReady] = useState(false);
+
   useEffect(() => {
     SoundEffectService.setEnabled(soundsEnabled);
   }, [soundsEnabled]);
@@ -50,8 +60,14 @@ export const Workout: React.FC = () => {
 
   // Strict cleanup on unmount
   useEffect(() => {
+    // Initialize pose engine
+    PoseDetectionService.getInstance().initialize().then(() => {
+      setIsTrackingReady(true);
+    });
+
     return () => {
       SystemVoiceService.endSession();
+      PoseDetectionService.getInstance().stopCamera();
     };
   }, []);
 
@@ -119,6 +135,56 @@ export const Workout: React.FC = () => {
     return () => clearInterval(interval);
   }, [isResting, restTimeLeft, activeWorkout, currentExerciseIndex, currentSetIndex]);
 
+  // AI Camera tracking lifecycle
+  useEffect(() => {
+    if (viewState === 'active' && activeWorkout && cameraEnabled && isTrackingReady) {
+      const currentEx = activeWorkout.exercises[currentExerciseIndex];
+      const currentSet = currentEx.sets[currentSetIndex];
+      const def = getExerciseById(currentEx.exerciseId);
+      
+      const engine = ExerciseAnalysisEngine.getInstance();
+      const poseService = PoseDetectionService.getInstance();
+
+      // Only start if exercise is supported (simple check for now)
+      const isSupported = def && ['push-up', 'squat', 'lunge', 'curl'].some(k => def.name.toLowerCase().includes(k));
+
+      if (isSupported && videoRef.current && canvasRef.current) {
+        // Start engine
+        engine.startExercise(def.name, currentSet.targetReps || 0);
+
+        // Setup callbacks
+        engine.onStateChange = (state) => {
+          setAnalysisResult((prev: any) => ({ ...prev, state }));
+        };
+
+        engine.onRepComplete = (reps) => {
+          setAnalysisResult((prev: any) => ({ ...prev, reps }));
+          // If we hit the target
+          if (currentSet.targetReps && reps >= currentSet.targetReps) {
+            handleCompleteSet();
+          }
+        };
+
+        poseService.onPoseDetected = (result) => {
+          const res = engine.processPose(result);
+          setAnalysisResult(res);
+        };
+
+        poseService.startCamera(videoRef.current, canvasRef.current).catch(err => {
+          console.error("Camera failed to start", err);
+        });
+      }
+
+      return () => {
+        poseService.stopCamera();
+        poseService.onPoseDetected = null;
+        engine.onStateChange = null;
+        engine.onRepComplete = null;
+      };
+    } else {
+      PoseDetectionService.getInstance().stopCamera();
+    }
+  }, [viewState, activeWorkout, currentExerciseIndex, currentSetIndex, cameraEnabled, isTrackingReady]);
 
   if (!profile.isCompleted) {
     return (
@@ -178,9 +244,12 @@ export const Workout: React.FC = () => {
     HapticService.confirm();
     SoundEffectService.playConfirm();
 
-    updateActiveSet(currentExerciseIndex, currentSetIndex, { completed: true });
-    
     const currentEx = activeWorkout.exercises[currentExerciseIndex];
+    const currentSet = currentEx.sets[currentSetIndex];
+
+    const actualReps = (cameraEnabled && analysisResult && analysisResult.reps > 0) ? analysisResult.reps : currentSet.targetReps;
+    updateActiveSet(currentExerciseIndex, currentSetIndex, { completed: true, actualReps });
+    
     const isLastSet = currentSetIndex >= currentEx.sets.length - 1;
     const isLastExercise = currentExerciseIndex >= activeWorkout.exercises.length - 1;
 
@@ -244,6 +313,19 @@ export const Workout: React.FC = () => {
       position: 'absolute', top: '16px', right: '16px',
       display: 'flex', alignItems: 'center', gap: '16px',
     }}>
+      <button 
+        onClick={() => {
+          HapticService.selection();
+          setCameraEnabled(!cameraEnabled);
+          if (!cameraEnabled) {
+             setTimeout(() => SoundEffectService.playClick(), 50);
+          }
+        }}
+        style={{ background: 'none', border: 'none', color: cameraEnabled ? 'var(--accent-cyan)' : 'var(--text-dim)', cursor: 'pointer' }}
+      >
+        {cameraEnabled ? <Camera size={20} /> : <CameraOff size={20} />}
+      </button>
+
       <button 
         onClick={() => {
           HapticService.selection();
@@ -466,6 +548,38 @@ export const Workout: React.FC = () => {
           {def?.name}
         </h2>
 
+        {/* Camera Tracking UI */}
+        {cameraEnabled && isTrackingReady && (
+          <div style={{ 
+            position: 'relative', width: '100%', aspectRatio: '4/3', 
+            backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden', 
+            marginBottom: '16px', border: '1px solid var(--border-accent)' 
+          }}>
+            <video 
+              ref={videoRef} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
+              playsInline muted 
+            />
+            <canvas 
+              ref={canvasRef} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
+            />
+            
+            {/* Tracking Status Overlay */}
+            <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '8px' }}>
+              <div style={{ background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', color: 'var(--accent-cyan)' }}>
+                AI TRACKING {analysisResult?.confidence > 0.4 ? 'ACTIVE' : 'PAUSED'}
+              </div>
+            </div>
+
+            {/* Diagnostics overlay (dev mode hidden normally, but we show basic info) */}
+            <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', padding: '8px', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--text-dim)', textAlign: 'right' }}>
+              <div>STATE: {analysisResult?.state || 'IDLE'}</div>
+              <div>CONF: {Math.round((analysisResult?.confidence || 0) * 100)}%</div>
+            </div>
+          </div>
+        )}
+
         {prevPerf && (
           <div style={{ textAlign: 'center', marginBottom: '16px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
             LAST SESSION: {prevPerf.actualReps || prevPerf.targetReps} REPS
@@ -477,6 +591,11 @@ export const Workout: React.FC = () => {
           <div style={{ fontSize: '3rem', color: 'var(--accent-cyan)', textShadow: 'var(--system-glow)', fontFamily: 'var(--font-system)' }}>
             {def?.movementType === 'repetition' ? `${currentSet.targetReps} REPS` : `${currentSet.targetDuration} SEC`}
           </div>
+          {cameraEnabled && def?.movementType === 'repetition' && (
+            <div style={{ fontSize: '2rem', color: '#fff', marginTop: '16px' }}>
+              ACTUAL: <span style={{ color: 'var(--accent-cyan)' }}>{analysisResult?.reps || 0}</span>
+            </div>
+          )}
         </div>
 
         <div style={{ marginTop: 'auto' }}>

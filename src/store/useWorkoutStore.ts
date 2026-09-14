@@ -60,11 +60,13 @@ interface WorkoutState {
   activeWorkout: WorkoutSession | null;
   voiceEnabled: boolean;
   soundsEnabled: boolean;
+  cameraEnabled: boolean;
   weeklyPlan: TrainingDayPlan[];
   
   // Actions
   setVoiceEnabled: (enabled: boolean) => void;
   setSoundsEnabled: (enabled: boolean) => void;
+  setCameraEnabled: (enabled: boolean) => void;
   setWeeklyPlan: (plan: TrainingDayPlan[]) => void;
   startWorkout: (session: WorkoutSession) => void;
   updateActiveSet: (exerciseIndex: number, setIndex: number, data: Partial<WorkoutSet>) => void;
@@ -80,10 +82,12 @@ export const useWorkoutStore = create<WorkoutState>()(
       activeWorkout: null,
       voiceEnabled: true,
       soundsEnabled: true,
+      cameraEnabled: true,
       weeklyPlan: [],
 
       setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
       setSoundsEnabled: (enabled) => set({ soundsEnabled: enabled }),
+      setCameraEnabled: (enabled) => set({ cameraEnabled: enabled }),
       setWeeklyPlan: (plan) => set({ weeklyPlan: plan }),
 
       startWorkout: (session) => set({ activeWorkout: session }),
