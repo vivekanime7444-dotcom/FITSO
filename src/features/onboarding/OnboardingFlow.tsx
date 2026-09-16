@@ -280,7 +280,7 @@ export const OnboardingFlow: React.FC = () => {
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>Upload a clear training/physique reference image.</p>
                   <label style={{ display: 'block', padding: '12px', textAlign: 'center', border: '1px dashed var(--accent-cyan)', cursor: 'pointer', color: 'var(--accent-cyan)' }}>
                      [ UPLOAD REFERENCE IMAGE ]
-                     <input type="file" accept="image/*" capture="environment" onChange={handleImageUpload} style={{ display: 'none' }} />
+                     <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
                   </label>
                </div>
             )}
