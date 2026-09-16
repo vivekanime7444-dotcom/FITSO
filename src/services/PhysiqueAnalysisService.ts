@@ -62,13 +62,17 @@ CRITICAL RULES:
 `;
 
     let attempt = 0;
-    const maxAttempts = 5;
+    const maxAttempts = 3;
     let delayMs = 2000;
 
     while (attempt < maxAttempts) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout per request
+
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent?key=${this.API_KEY}`, {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -90,6 +94,8 @@ CRITICAL RULES:
             }
           })
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
           // If the error is a 503 (Unavailable) or 429 (Too Many Requests), we retry automatically
