@@ -178,9 +178,40 @@ export const OnboardingFlow: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setPhysiqueImage(reader.result as string);
-        setPhysiqueState('IMAGE_SELECTED');
-        HapticService.selection();
+        const img = new Image();
+        img.onload = () => {
+          // Compress the image to max 800px width/height to avoid payload limits
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 800;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width;
+            width = MAX_SIZE;
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height;
+            height = MAX_SIZE;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress heavily to ensure small payload (JPEG 0.6)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+            setPhysiqueImage(compressedBase64);
+            setPhysiqueState('IMAGE_SELECTED');
+            HapticService.selection();
+          } else {
+            // Fallback if canvas fails
+            setPhysiqueImage(reader.result as string);
+            setPhysiqueState('IMAGE_SELECTED');
+            HapticService.selection();
+          }
+        };
+        img.src = reader.result as string;
       };
       reader.readAsDataURL(file);
     }
