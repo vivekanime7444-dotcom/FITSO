@@ -100,7 +100,8 @@ Do not guess. Prefer INVALID over incorrect analysis.
       });
 
       if (!response.ok) {
-        throw new Error(`OpenRouter API error: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API error [${response.status}]: ${errorText || response.statusText}`);
       }
 
       const data = await response.json();
