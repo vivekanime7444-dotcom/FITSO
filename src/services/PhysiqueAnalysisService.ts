@@ -62,58 +62,89 @@ VALIDATION RULES (STRICT):
 Do not guess. Prefer INVALID over incorrect analysis.
 `;
 
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent?key=${this.API_KEY}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: systemPrompt },
-              { text: "Analyze this image according to your strict validation rules." },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: base64Data
+    let attempt = 0;
+    const maxAttempts = 5;
+    let delayMs = 2000;
+
+    while (attempt < maxAttempts) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent?key=${this.API_KEY}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: systemPrompt },
+                { text: "Analyze this image according to your strict validation rules." },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
                 }
-              }
-            ]
-          }],
-          generationConfig: {
-            responseMimeType: "application/json"
+              ]
+            }],
+            generationConfig: {
+              responseMimeType: "application/json"
+            }
+          })
+        });
+
+        if (!response.ok) {
+          // If the error is a 503 (Unavailable) or 429 (Too Many Requests), we retry automatically
+          if ((response.status === 503 || response.status === 429) && attempt < maxAttempts - 1) {
+            attempt++;
+            console.warn(`Gemini API busy (Status ${response.status}). Retrying in ${delayMs}ms... (Attempt ${attempt + 1}/${maxAttempts})`);
+            await new Promise(r => setTimeout(r, delayMs));
+            delayMs *= 2; // Exponential backoff (2s, 4s, 8s, 16s)
+            continue;
           }
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error [${response.status}]: ${errorText || response.statusText}`);
-      }
-
-      const data = await response.json();
-      const content = data.candidates[0].content.parts[0].text;
-      
-      // Clean potential markdown blocks
-      const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
-      
-      const result = JSON.parse(cleanContent) as PhysiqueAnalysisResult;
-      
-      return { id: referenceId, result };
-    } catch (error) {
-      console.error("Vision API Error:", error);
-      // Return a safe fallback error state
-      return {
-        id: referenceId,
-        result: {
-          referenceValid: false,
-          humanDetected: false,
-          imageQuality: 'unknown',
-          reason: `Network/API Error: ${error instanceof Error ? error.message : String(error)}`
+          
+          const errorText = await response.text();
+          throw new Error(`Gemini API error [${response.status}]: ${errorText || response.statusText}`);
         }
-      };
+
+        const data = await response.json();
+        const content = data.candidates[0].content.parts[0].text;
+        
+        // Clean potential markdown blocks
+        const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        const result = JSON.parse(cleanContent) as PhysiqueAnalysisResult;
+        
+        return { id: referenceId, result };
+      } catch (error: any) {
+        // If it's a structural error (not 503/429), or we exhausted all retries, fail here
+        if (attempt >= maxAttempts - 1 || !(error.message && (error.message.includes('[503]') || error.message.includes('[429]')))) {
+          console.error("Vision API Error:", error);
+          return {
+            id: referenceId,
+            result: {
+              referenceValid: false,
+              humanDetected: false,
+              imageQuality: 'unknown',
+              reason: `Network/API Error: ${error instanceof Error ? error.message : String(error)}`
+            }
+          };
+        }
+        attempt++;
+        await new Promise(r => setTimeout(r, delayMs));
+        delayMs *= 2;
+      }
     }
+
+    // Should theoretically never reach here, but TypeScript requires a return
+    return {
+      id: referenceId,
+      result: {
+        referenceValid: false,
+        humanDetected: false,
+        imageQuality: 'unknown',
+        reason: 'Max retries exceeded'
+      }
+    };
   }
 
   // Fallback mock for local testing without an API key

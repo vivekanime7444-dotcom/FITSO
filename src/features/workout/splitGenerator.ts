@@ -10,7 +10,43 @@ export const generateWeeklySplit = (profile: UserProfile): TrainingDayPlan[] => 
   let splitSequence: Omit<TrainingDayPlan, 'dayOfWeek' | 'isRestDay'>[] = [];
 
   // Determine the sequence of training protocols based on frequency
-  if (count === 1 || count === 2) {
+  if (profile.physiqueAnalysis && profile.physiqueAnalysis.muscleGroups) {
+    const analysis = profile.physiqueAnalysis;
+    const focusMuscles = analysis.muscleGroups.length > 0 ? analysis.muscleGroups : ['Full Body'];
+    
+    // Dynamic split based on AI analysis
+    if (count <= 2) {
+      splitSequence = Array(count).fill(0).map((_, i) => ({
+        protocolName: `PHYSIQUE FOCUS ${String.fromCharCode(65 + i)}`,
+        targetMuscles: [...focusMuscles, 'Core']
+      }));
+    } else if (count === 3) {
+      splitSequence = [
+        { protocolName: 'AI PRIMARY FOCUS', targetMuscles: focusMuscles },
+        { protocolName: 'SECONDARY DEVELOPMENT', targetMuscles: ['Legs', 'Back', 'Core'].filter(m => !focusMuscles.includes(m)) },
+        { protocolName: 'FULL BODY INTEGRATION', targetMuscles: ['Chest', 'Back', 'Legs', 'Shoulders', 'Core'] }
+      ];
+    } else if (count === 4) {
+      splitSequence = [
+        { protocolName: 'AI PRIMARY FOCUS A', targetMuscles: focusMuscles },
+        { protocolName: 'SECONDARY DEVELOPMENT A', targetMuscles: ['Legs', 'Glutes', 'Core'] },
+        { protocolName: 'AI PRIMARY FOCUS B', targetMuscles: focusMuscles },
+        { protocolName: 'SECONDARY DEVELOPMENT B', targetMuscles: ['Back', 'Chest', 'Shoulders'].filter(m => !focusMuscles.includes(m)) }
+      ];
+    } else {
+      splitSequence = [
+        { protocolName: 'AI PRIMARY FOCUS A', targetMuscles: focusMuscles },
+        { protocolName: 'SUPPORTING MUSCLES', targetMuscles: ['Legs', 'Back', 'Core'].filter(m => !focusMuscles.includes(m)) },
+        { protocolName: 'AI PRIMARY FOCUS B', targetMuscles: focusMuscles },
+        { protocolName: 'HYPERTROPHY VOLUME', targetMuscles: ['Chest', 'Shoulders', 'Arms'].filter(m => !focusMuscles.includes(m)) },
+        { protocolName: 'CONDITIONING & CORE', targetMuscles: ['Conditioning', 'Core'] }
+      ];
+      // Pad to exact count if needed
+      while (splitSequence.length < count) {
+        splitSequence.push({ protocolName: 'FULL BODY BURN', targetMuscles: ['Chest', 'Back', 'Legs', 'Core'] });
+      }
+    }
+  } else if (count === 1 || count === 2) {
     splitSequence = [
       { protocolName: 'FULL BODY A', targetMuscles: ['Chest', 'Back', 'Legs', 'Shoulders', 'Core'] },
       { protocolName: 'FULL BODY B', targetMuscles: ['Chest', 'Back', 'Legs', 'Shoulders', 'Core'] },
@@ -56,6 +92,11 @@ export const generateWeeklySplit = (profile: UserProfile): TrainingDayPlan[] => 
       { protocolName: 'CONDITIONING', targetMuscles: ['Conditioning', 'Core'] }, 
     ];
   }
+
+  // Ensure targetMuscles are not empty due to filter
+  splitSequence.forEach(seq => {
+    if (seq.targetMuscles.length === 0) seq.targetMuscles = ['Core', 'Conditioning'];
+  });
 
   // Map the sequence to the actual days of the week the user selected
   const weeklyPlan: TrainingDayPlan[] = [];
