@@ -15,8 +15,8 @@ export const Progress: React.FC = () => {
   
   // Get unique muscles that have photos
   const uniqueMuscles = Array.from(
-    new Set(musclePhotos.flatMap(p => p.muscleGroups))
-  );
+    new Set(musclePhotos.flatMap(p => p.muscleGroups || []))
+  ).filter(Boolean);
 
   const renderHistory = () => {
     if (workoutHistory.length === 0) {

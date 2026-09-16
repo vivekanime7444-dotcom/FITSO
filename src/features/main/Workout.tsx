@@ -215,7 +215,7 @@ export const Workout: React.FC = () => {
     );
   }
 
-  const displayWorkout = activeWorkout || proposedWorkout;
+  const displayWorkout = activeWorkout || proposedWorkout || ((viewState === 'summary' || viewState === 'capture') ? workoutHistory[0] : null);
 
   if (!displayWorkout) {
     return (
@@ -738,7 +738,7 @@ export const Workout: React.FC = () => {
           const workout = displayWorkout;
           if (workout) {
             addPhoto({
-              id: `photo_${crypto.randomUUID()}`,
+              id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
               workoutSessionId: workout.id,
               date: new Date().toISOString(),
               timestamp: Date.now(),
