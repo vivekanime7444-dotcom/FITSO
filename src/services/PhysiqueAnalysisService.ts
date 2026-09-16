@@ -37,14 +37,15 @@ export class PhysiqueAnalysisService {
       base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     }
 
-    const systemPrompt = `
-You are a strict fitness and computer vision AI. Your task is to validate and analyze training/physique reference images.
-You must return a raw JSON object (without markdown formatting) conforming exactly to this schema:
+const systemPrompt = `
+You are a highly strict computer vision AI used for a fitness app. Your ONLY task is to validate if an image is a legitimate human physique reference.
+
+You MUST return a raw JSON object (NO markdown, NO formatting) matching this schema:
 {
   "referenceValid": boolean,
   "humanDetected": boolean,
   "imageQuality": "good" | "acceptable" | "poor",
-  "reason": "Explain why the image was accepted or rejected.",
+  "reason": "Explain exactly what you see and why it is accepted or rejected.",
   "trainingAnalysis": {
     "trainingEmphasis": string[],
     "muscleGroups": string[],
@@ -53,13 +54,11 @@ You must return a raw JSON object (without markdown formatting) conforming exact
   }
 }
 
-VALIDATION RULES (STRICT):
-1. The image MUST contain a human subject that is clearly visible.
-2. REJECT (referenceValid: false) if the image is a banana, food, dog, pet, empty room, random object, extremely blurry, completely dark, heavily cropped, or meme.
-3. If rejected, DO NOT provide "trainingAnalysis".
-4. If accepted (referenceValid: true), analyze the human's physique/training type. Do NOT rate attractiveness or body shame. Provide broad training goals (e.g., ["Hypertrophy", "Upper Body Emphasis"]).
-
-Do not guess. Prefer INVALID over incorrect analysis.
+CRITICAL RULES:
+1. FIRST, check if there is a REAL HUMAN in the photo. If the image is a banana, food, an animal, a cartoon, an empty room, a random object, a landscape, a screen, or text: YOU MUST SET "humanDetected": false AND "referenceValid": false.
+2. If it is NOT a human physique reference, DO NOT include the "trainingAnalysis" field at all. Just provide the reason.
+3. If it IS a valid human, set "referenceValid": true and fill out "trainingAnalysis" based on the visible muscular development.
+4. DO NOT guess. If you are unsure, reject it.
 `;
 
     let attempt = 0;
@@ -157,7 +156,7 @@ Do not guess. Prefer INVALID over incorrect analysis.
             referenceValid: true,
             humanDetected: true,
             imageQuality: 'good',
-            reason: 'Mock validation successful.',
+            reason: '[MOCK MODE] No API key found. Defaulting to accepted.',
             trainingAnalysis: {
               trainingEmphasis: ['Hypertrophy', 'Strength'],
               muscleGroups: ['Chest', 'Shoulders', 'Back', 'Core'],
