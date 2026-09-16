@@ -1,17 +1,15 @@
 import { HapticService } from './HapticService';
-import { LandmarkSmoother, TemporalValidator } from './TemporalFilter';
+import { LandmarkSmoother } from './TemporalFilter';
 import { PostureValidator, type PostureState } from './PostureValidator';
 import { SkeletonMapper } from './SkeletonMapper';
-import type { SkeletonFrame } from './SkeletonMapper';
-import { BodyOrientationDetector } from './BodyOrientationDetector';
-import type { BodyOrientation } from './BodyOrientationDetector';
+import { BodyOrientationDetector, type BodyOrientation } from './BodyOrientationDetector';
 import { VisibilityEngine } from './VisibilityEngine';
 import type { TrackingStatus } from './VisibilityEngine';
 import { PushUpAnalyzer } from './analyzers/PushUpAnalyzer';
 import { SquatAnalyzer } from './analyzers/SquatAnalyzer';
 import { CurlAnalyzer } from './analyzers/CurlAnalyzer';
-
-export type RepState = 'NOT_READY' | 'READY' | 'DESCENDING' | 'BOTTOM_CONFIRMED' | 'ASCENDING' | 'TOP_CONFIRMED' | 'REP_COMPLETE';
+import { RepStateMachine, type RepState } from './RepStateMachine';
+import { MovementTracker } from './MovementTracker';
 
 export interface AnalysisResult {
   state: RepState;
@@ -22,26 +20,34 @@ export interface AnalysisResult {
   orientation: BodyOrientation;
   trackingStatus: TrackingStatus;
   primarySide: string;
+  rom: number; // 0-100
 }
 
 export class ExerciseAnalysisEngine {
   private static instance: ExerciseAnalysisEngine;
   
-  private currentState: RepState = 'NOT_READY';
   private currentReps = 0;
   private currentExercise: string = '';
+  private currentRom = 0;
   
-  // Smoothing and Validation
-  private smoother = new LandmarkSmoother(0.25); // Heavy smoothing for stability
-  private positionValidator = new TemporalValidator(1000);  // Must hold READY for 1000ms
-  private bottomValidator = new TemporalValidator(200);    // Strict bottom hold for ROM validation
-  private topValidator = new TemporalValidator(200);       // Strict top hold for ROM validation
+  private smoother = new LandmarkSmoother(0.25);
+  private stateMachine = new RepStateMachine();
+  private movementTracker = new MovementTracker();
   
-  // Callbacks
   public onRepComplete: ((reps: number) => void) | null = null;
   public onStateChange: ((state: RepState) => void) | null = null;
 
-  private constructor() {}
+  private constructor() {
+    this.stateMachine.onRepComplete = () => {
+      this.currentReps++;
+      HapticService.selection();
+      if (this.onRepComplete) this.onRepComplete(this.currentReps);
+    };
+    
+    this.stateMachine.onStateChange = (state) => {
+      if (this.onStateChange) this.onStateChange(state);
+    };
+  }
 
   public static getInstance(): ExerciseAnalysisEngine {
     if (!ExerciseAnalysisEngine.instance) {
@@ -53,29 +59,29 @@ export class ExerciseAnalysisEngine {
   public startExercise(exerciseName: string, _targetReps: number) {
     this.currentExercise = exerciseName.toLowerCase();
     this.currentReps = 0;
-    this.currentState = 'NOT_READY';
+    this.currentRom = 0;
     this.smoother.reset();
-    this.positionValidator.reset();
-    this.bottomValidator.reset();
-    this.topValidator.reset();
-    this.emitState('NOT_READY');
+    this.stateMachine.reset();
+    this.movementTracker.reset();
   }
 
   public processPose(poseResult: any): AnalysisResult {
+    const now = performance.now();
+    
     const defaultResult: AnalysisResult = {
-      state: this.currentState,
+      state: this.stateMachine.getState(),
       reps: this.currentReps,
       feedback: null,
       confidence: 0,
       posture: 'UNKNOWN',
       orientation: 'UNKNOWN',
       trackingStatus: 'PAUSED',
-      primarySide: 'UNKNOWN'
+      primarySide: 'UNKNOWN',
+      rom: this.currentRom
     };
 
     if (!poseResult || !poseResult.landmarks || poseResult.landmarks.length === 0) {
-      this.positionValidator.reset();
-      this.changeState('NOT_READY');
+      this.stateMachine.update(false, null, now);
       return defaultResult;
     }
 
@@ -92,215 +98,66 @@ export class ExerciseAnalysisEngine {
     let trackingStatus: TrackingStatus = 'ACTIVE';
     let primarySide = 'BOTH';
     let confidence = 0;
+    let rom: number | null = null;
+    let isPostureValid = false;
 
     if (this.currentExercise.includes('push-up')) {
       const visibility = VisibilityEngine.evaluatePushUp(frame);
       trackingStatus = visibility.status;
       primarySide = visibility.primarySide;
-      this.analyzePushup(frame, orientation, visibility);
+      isPostureValid = PostureValidator.isReadyForPushUp(frame);
+      if (trackingStatus !== 'PAUSED') {
+         rom = PushUpAnalyzer.getROM(frame, orientation, visibility);
+      }
     } else if (this.currentExercise.includes('squat')) {
       const visibility = VisibilityEngine.evaluateSquat(frame);
       trackingStatus = visibility.status;
       primarySide = visibility.primarySide;
-      this.analyzeSquat(frame, orientation, visibility);
+      isPostureValid = PostureValidator.isReadyForSquat(frame);
+      if (trackingStatus !== 'PAUSED') {
+         rom = SquatAnalyzer.getROM(frame, orientation, visibility);
+      }
     } else if (this.currentExercise.includes('curl')) {
       const visibility = VisibilityEngine.evaluateCurl(frame);
       trackingStatus = visibility.status;
       primarySide = visibility.primarySide;
-      this.analyzeCurl(frame, orientation, visibility);
+      isPostureValid = PostureValidator.isReadyForCurl(frame);
+      if (trackingStatus !== 'PAUSED') {
+         rom = CurlAnalyzer.getROM(frame, orientation, visibility);
+      }
     } else {
-      // Temporarily disable others
-      this.changeState('NOT_READY');
-      feedback = "Exercise not supported yet in Phase 6 core fix.";
       trackingStatus = 'PAUSED';
+      feedback = "Exercise not supported by position engine.";
     }
 
-    // Estimate confidence based on tracking status for the UI
-    confidence = trackingStatus === 'ACTIVE' ? 0.9 : trackingStatus === 'DEGRADED' ? 0.6 : 0.2;
+    if (rom !== null) {
+       this.currentRom = rom;
+       const movementData = this.movementTracker.addFrame(frame, rom, now);
+       
+       if (movementData.isCameraShake) {
+          // Camera is shaking, degrade tracking and don't update state machine
+          trackingStatus = 'DEGRADED';
+          feedback = "Camera Shake Detected";
+       } else {
+          this.stateMachine.update(isPostureValid, rom, now);
+       }
+    } else {
+       this.stateMachine.update(false, null, now);
+    }
+
+    confidence = trackingStatus === 'ACTIVE' ? 0.95 : trackingStatus === 'DEGRADED' ? 0.6 : 0.2;
 
     return {
-      state: this.currentState,
+      state: this.stateMachine.getState(),
       reps: this.currentReps,
       feedback,
       confidence,
       posture,
       orientation,
       trackingStatus,
-      primarySide
+      primarySide,
+      rom: this.currentRom
     };
-  }
-
-  private changeState(newState: RepState) {
-    if (this.currentState !== newState) {
-      this.currentState = newState;
-      this.emitState(newState);
-    }
-  }
-
-  private emitState(state: RepState) {
-    if (this.onStateChange) this.onStateChange(state);
-  }
-
-  // === MULTI-VIEW PUSH-UP ENGINE ===
-  private analyzePushup(frame: SkeletonFrame, orientation: BodyOrientation, visibility: any) {
-    if (visibility.status === 'PAUSED') return;
-
-    const isPostureValid = PostureValidator.isReadyForPushUp(frame);
-    const isReady = this.positionValidator.validate(isPostureValid ? 'VALID' : 'INVALID');
-
-    if (!isReady) {
-      this.changeState('NOT_READY');
-      this.bottomValidator.reset();
-      this.topValidator.reset();
-      return;
-    }
-
-    const metricAngle = PushUpAnalyzer.getPrimaryMetric(frame, orientation, visibility);
-    if (metricAngle === null) return;
-
-    switch (this.currentState) {
-      case 'NOT_READY':
-      case 'REP_COMPLETE':
-        if (metricAngle > 150) this.changeState('READY');
-        break;
-      case 'READY':
-        if (metricAngle < 140) this.changeState('DESCENDING');
-        break;
-      case 'DESCENDING':
-        if (metricAngle <= 90) {
-          if (this.bottomValidator.validate('BOTTOM')) this.changeState('BOTTOM_CONFIRMED');
-        } else {
-          this.bottomValidator.reset();
-          if (metricAngle > 150) this.changeState('READY');
-        }
-        break;
-      case 'BOTTOM_CONFIRMED':
-        if (metricAngle > 100) this.changeState('ASCENDING');
-        break;
-      case 'ASCENDING':
-        if (metricAngle > 150) {
-          if (this.topValidator.validate('TOP')) this.changeState('TOP_CONFIRMED');
-        } else {
-          this.topValidator.reset();
-          if (metricAngle < 100) this.changeState('DESCENDING');
-        }
-        break;
-      case 'TOP_CONFIRMED':
-        this.currentReps++;
-        this.changeState('REP_COMPLETE');
-        HapticService.selection();
-        if (this.onRepComplete) this.onRepComplete(this.currentReps);
-        break;
-    }
-  }
-
-  // === MULTI-VIEW SQUAT ENGINE ===
-  private analyzeSquat(frame: SkeletonFrame, orientation: BodyOrientation, visibility: any) {
-    if (visibility.status === 'PAUSED') return;
-
-    const isPostureValid = PostureValidator.isReadyForSquat(frame);
-    const isReady = this.positionValidator.validate(isPostureValid ? 'VALID' : 'INVALID');
-
-    if (!isReady) {
-      this.changeState('NOT_READY');
-      this.bottomValidator.reset();
-      this.topValidator.reset();
-      return;
-    }
-
-    const metricAngle = SquatAnalyzer.getPrimaryMetric(frame, orientation, visibility);
-    if (metricAngle === null) return;
-
-    switch (this.currentState) {
-      case 'NOT_READY':
-      case 'REP_COMPLETE':
-        if (metricAngle > 160) this.changeState('READY'); // Standing straight
-        break;
-      case 'READY':
-        if (metricAngle < 150) this.changeState('DESCENDING');
-        break;
-      case 'DESCENDING':
-        // Bottom of squat (90 degrees or lower)
-        if (metricAngle <= 100) {
-          if (this.bottomValidator.validate('BOTTOM')) this.changeState('BOTTOM_CONFIRMED');
-        } else {
-          this.bottomValidator.reset();
-          if (metricAngle > 160) this.changeState('READY');
-        }
-        break;
-      case 'BOTTOM_CONFIRMED':
-        if (metricAngle > 110) this.changeState('ASCENDING');
-        break;
-      case 'ASCENDING':
-        if (metricAngle > 160) {
-          if (this.topValidator.validate('TOP')) this.changeState('TOP_CONFIRMED');
-        } else {
-          this.topValidator.reset();
-          if (metricAngle < 110) this.changeState('DESCENDING');
-        }
-        break;
-      case 'TOP_CONFIRMED':
-        this.currentReps++;
-        this.changeState('REP_COMPLETE');
-        HapticService.selection();
-        if (this.onRepComplete) this.onRepComplete(this.currentReps);
-        break;
-    }
-  }
-
-  // === MULTI-VIEW CURL ENGINE ===
-  private analyzeCurl(frame: SkeletonFrame, orientation: BodyOrientation, visibility: any) {
-    if (visibility.status === 'PAUSED') return;
-
-    const isPostureValid = PostureValidator.isReadyForCurl(frame);
-    const isReady = this.positionValidator.validate(isPostureValid ? 'VALID' : 'INVALID');
-
-    if (!isReady) {
-      this.changeState('NOT_READY');
-      this.bottomValidator.reset();
-      this.topValidator.reset();
-      return;
-    }
-
-    const metricAngle = CurlAnalyzer.getPrimaryMetric(frame, orientation, visibility);
-    if (metricAngle === null) return;
-
-    // Curl ROM: > 150 = straight arm (bottom), < 50 = fully curled (top)
-    switch (this.currentState) {
-      case 'NOT_READY':
-      case 'REP_COMPLETE':
-        if (metricAngle > 150) this.changeState('READY'); // Arm extended at bottom
-        break;
-      case 'READY':
-        if (metricAngle < 140) this.changeState('ASCENDING'); // Start curling up
-        break;
-      case 'ASCENDING':
-        // Top of curl (50 degrees or lower)
-        if (metricAngle <= 55) {
-          if (this.topValidator.validate('TOP')) this.changeState('TOP_CONFIRMED');
-        } else {
-          this.topValidator.reset();
-          if (metricAngle > 150) this.changeState('READY'); // Aborted curl
-        }
-        break;
-      case 'TOP_CONFIRMED':
-        if (metricAngle > 70) this.changeState('DESCENDING');
-        break;
-      case 'DESCENDING':
-        if (metricAngle > 150) {
-          if (this.bottomValidator.validate('BOTTOM')) this.changeState('BOTTOM_CONFIRMED');
-        } else {
-          this.bottomValidator.reset();
-          if (metricAngle < 70) this.changeState('ASCENDING'); // Bounced back up
-        }
-        break;
-      case 'BOTTOM_CONFIRMED':
-        this.currentReps++;
-        this.changeState('REP_COMPLETE');
-        HapticService.selection();
-        if (this.onRepComplete) this.onRepComplete(this.currentReps);
-        break;
-    }
   }
 }
 

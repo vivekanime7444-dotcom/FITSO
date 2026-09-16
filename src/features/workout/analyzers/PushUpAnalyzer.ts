@@ -25,7 +25,7 @@ export class PushUpAnalyzer {
     return 90 + (ratio * 90); 
   }
 
-  public static getPrimaryMetric(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
+  public static getROM(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
     if (visibility.status === 'PAUSED') return null;
 
     const useLeft = visibility.primarySide === 'LEFT' || visibility.primarySide === 'BOTH';
@@ -33,15 +33,22 @@ export class PushUpAnalyzer {
     const elbow = useLeft ? frame.leftElbow! : frame.rightElbow!;
     const wrist = useLeft ? frame.leftWrist! : frame.rightWrist!;
 
+    if (!shoulder || !elbow || !wrist) return null;
+
+    let angle = 150;
+
     if (orientation === 'LEFT_PROFILE' || orientation === 'RIGHT_PROFILE') {
-      // Perfect side view, X and Y coordinates are highly reliable for angle
-      return this.calculateAngle(shoulder, elbow, wrist);
+      angle = this.calculateAngle(shoulder, elbow, wrist);
     } else if (orientation === 'FRONT' || orientation === 'BACK') {
-      // Front view, X is compressed. Use Y and Z heuristic.
-      return this.calculateFrontAngle(shoulder, elbow, wrist);
+      angle = this.calculateFrontAngle(shoulder, elbow, wrist);
     } else {
-      // Three-quarter view. A mix of both, standard angle works decently well.
-      return this.calculateAngle(shoulder, elbow, wrist);
+      angle = this.calculateAngle(shoulder, elbow, wrist);
     }
+
+    // Normalize to ROM 0-100%
+    // Top (Angle >= 150) -> ROM 0
+    // Bottom (Angle <= 90) -> ROM 100
+    const rom = ((150 - angle) / (150 - 90)) * 100;
+    return Math.max(0, Math.min(100, rom));
   }
 }

@@ -39,7 +39,7 @@ export class CurlAnalyzer {
     return Math.max(30, Math.min(180, approxAngle));
   }
 
-  public static getPrimaryMetric(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
+  public static getROM(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
     if (visibility.status === 'PAUSED') return null;
 
     // We can track either arm. If BOTH, average them or just take the most visible.
@@ -52,21 +52,22 @@ export class CurlAnalyzer {
 
     if (!shoulder || !elbow || !wrist) return null;
 
-    // Check for excessive upper body movement / cheating (Elbow drifting far forward or backward from shoulder)
-    // In side profile, elbow X should remain relatively close to shoulder X.
-    // In side profile, elbow X should remain relatively close to shoulder X.
-    // If elbow drifts heavily, they are cheating or swinging, but we might still count it if it's not extreme.
-    // We'll let the angle logic handle the ROM, but this is a future hook for "bad form" warnings.
+    let angle = 150;
 
     if (orientation === 'LEFT_PROFILE' || orientation === 'RIGHT_PROFILE') {
-      // Side view, angle is highly accurate
-      return this.calculateAngle(shoulder, elbow, wrist);
+      angle = this.calculateAngle(shoulder, elbow, wrist);
     } else if (orientation === 'FRONT' || orientation === 'BACK') {
       // Front view, angle compresses, use vertical heuristic
-      return this.calculateFrontAngle(shoulder, elbow, wrist);
+      angle = this.calculateFrontAngle(shoulder, elbow, wrist);
     } else {
       // Three-quarter view
-      return this.calculateAngle(shoulder, elbow, wrist);
+      angle = this.calculateAngle(shoulder, elbow, wrist);
     }
+
+    // Normalize to ROM 0-100%
+    // Bottom (Angle >= 150) -> ROM 0
+    // Top (Angle <= 50) -> ROM 100
+    const rom = ((150 - angle) / (150 - 50)) * 100;
+    return Math.max(0, Math.min(100, rom));
   }
 }

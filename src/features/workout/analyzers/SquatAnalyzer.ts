@@ -31,7 +31,7 @@ export class SquatAnalyzer {
     return 90 + Math.min(ratio, 1.0) * 90; // Returns 90 to 180
   }
 
-  public static getPrimaryMetric(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
+  public static getROM(frame: SkeletonFrame, orientation: BodyOrientation, visibility: VisibilityReport): number | null {
     if (visibility.status === 'PAUSED') return null;
 
     const useLeft = visibility.primarySide === 'LEFT' || visibility.primarySide === 'BOTH';
@@ -41,16 +41,20 @@ export class SquatAnalyzer {
 
     if (!hip || !knee || !ankle) return null;
 
+    let angle = 160;
+
     if (orientation === 'LEFT_PROFILE' || orientation === 'RIGHT_PROFILE') {
-      // Side view, standard angle works perfectly
-      return this.calculateAngle(hip, knee, ankle);
+      angle = this.calculateAngle(hip, knee, ankle);
     } else if (orientation === 'FRONT' || orientation === 'BACK') {
-      // Front view, use vertical displacement heuristic
-      return this.calculateFrontSquatDepth(hip, knee, ankle);
+      angle = this.calculateFrontSquatDepth(hip, knee, ankle);
     } else {
-      // Three-quarter view, standard angle usually works okay, but displacement is safer
-      // We will blend or just use standard angle.
-      return this.calculateAngle(hip, knee, ankle);
+      angle = this.calculateAngle(hip, knee, ankle);
     }
+
+    // Normalize to ROM 0-100%
+    // Standing (Angle >= 160) -> ROM 0
+    // Deep Squat (Angle <= 90) -> ROM 100
+    const rom = ((160 - angle) / (160 - 90)) * 100;
+    return Math.max(0, Math.min(100, rom));
   }
 }

@@ -165,7 +165,7 @@ export const Workout: React.FC = () => {
           }
         };
 
-        let lastReportedState = engine['currentState'];
+        let lastReportedState = 'WAITING_FOR_POSITION';
         let lastReportedReps = 0;
         let lastUiUpdateTime = 0;
 
