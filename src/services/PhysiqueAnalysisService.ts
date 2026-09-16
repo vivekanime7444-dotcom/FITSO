@@ -121,7 +121,7 @@ Do not guess. Prefer INVALID over incorrect analysis.
           referenceValid: false,
           humanDetected: false,
           imageQuality: 'unknown',
-          reason: 'Network or API error occurred during validation.'
+          reason: `Network/API Error: ${error instanceof Error ? error.message : String(error)}`
         }
       };
     }
