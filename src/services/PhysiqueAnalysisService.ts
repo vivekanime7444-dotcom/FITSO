@@ -13,7 +13,7 @@ export interface PhysiqueAnalysisResult {
 
 export class PhysiqueAnalysisService {
   private static API_KEY = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_OPENROUTER_API_KEY || localStorage.getItem('OPENROUTER_API_KEY') || '';
-  private static MODEL = 'gemini-1.5-flash';
+  private static MODEL = 'gemini-1.5-flash-latest';
 
   public static async analyzeImage(base64Image: string): Promise<{ id: string; result: PhysiqueAnalysisResult }> {
     const referenceId = `ref_${crypto.randomUUID()}`;
