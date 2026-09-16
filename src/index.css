@@ -118,8 +118,6 @@ html, body {
 .animate-slide-up {
   animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
-
-/* Typography utilities */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-system);
   font-weight: 600;
