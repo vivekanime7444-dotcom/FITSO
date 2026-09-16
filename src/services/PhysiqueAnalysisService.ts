@@ -12,16 +12,15 @@ export interface PhysiqueAnalysisResult {
 }
 
 export class PhysiqueAnalysisService {
-  private static API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || localStorage.getItem('OPENROUTER_API_KEY') || '';
-  // Defaulting to a fast, reliable vision model that supports JSON mode.
-  private static MODEL = 'google/gemini-flash-1.5';
+  private static API_KEY = import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('GEMINI_API_KEY') || import.meta.env.VITE_OPENROUTER_API_KEY || localStorage.getItem('OPENROUTER_API_KEY') || '';
+  private static MODEL = 'gemini-1.5-flash';
 
   public static async analyzeImage(base64Image: string): Promise<{ id: string; result: PhysiqueAnalysisResult }> {
     const referenceId = `ref_${crypto.randomUUID()}`;
     
     // Ensure API key exists
     if (!this.API_KEY) {
-      console.warn("No OpenRouter API key found. Falling back to local mock for development.");
+      console.warn("No API key found. Falling back to local mock for development.");
       return this.mockAnalysis(referenceId);
     }
 
@@ -64,48 +63,37 @@ Do not guess. Prefer INVALID over incorrect analysis.
 `;
 
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${this.MODEL}:generateContent?key=${this.API_KEY}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.API_KEY}`,
-          'HTTP-Referer': window.location.href, // Required by OpenRouter
-          'X-Title': 'FITSO Training System', // Required by OpenRouter
         },
         body: JSON.stringify({
-          model: this.MODEL,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "text",
-                  text: "Analyze this image according to your strict validation rules."
-                },
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${base64Data}`
-                  }
+          contents: [{
+            parts: [
+              { text: systemPrompt },
+              { text: "Analyze this image according to your strict validation rules." },
+              {
+                inlineData: {
+                  mimeType: mimeType,
+                  data: base64Data
                 }
-              ]
-            }
-          ]
+              }
+            ]
+          }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
         })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OpenRouter API error [${response.status}]: ${errorText || response.statusText}`);
+        throw new Error(`Gemini API error [${response.status}]: ${errorText || response.statusText}`);
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
+      const content = data.candidates[0].content.parts[0].text;
       
       // Clean potential markdown blocks
       const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
