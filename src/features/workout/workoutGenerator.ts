@@ -46,13 +46,24 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
   if (profile.experienceLevel === 'Beginner') targetExercises = 4;
   else if (profile.experienceLevel === 'Advanced') targetExercises = 6;
 
-  const selectedDefs: ExerciseDef[] = [];
+  let selectedDefs: ExerciseDef[] = [];
   
+  // If Physique Goal, prioritize exercises that match the recommended categories/muscles
+  let prioritizedExercises = availableExercises;
+  if (profile.primaryGoal === 'Physique Goal' && profile.physiqueAnalysis) {
+    const { muscleGroups, recommendedExerciseCategories } = profile.physiqueAnalysis;
+    prioritizedExercises = availableExercises.sort((a, b) => {
+       const aMatch = muscleGroups.includes(a.muscleGroup) || recommendedExerciseCategories.some(c => a.name.toLowerCase().includes(c.toLowerCase())) ? 1 : 0;
+       const bMatch = muscleGroups.includes(b.muscleGroup) || recommendedExerciseCategories.some(c => b.name.toLowerCase().includes(c.toLowerCase())) ? 1 : 0;
+       return bMatch - aMatch;
+    });
+  }
+
   // Try to get at least one exercise for each target muscle
   for (const muscle of todayPlan.targetMuscles) {
     if (selectedDefs.length >= targetExercises) break;
     
-    const candidates = availableExercises.filter(ex => ex.muscleGroup === muscle && !selectedDefs.find(s => s.id === ex.id));
+    const candidates = prioritizedExercises.filter(ex => ex.muscleGroup === muscle && !selectedDefs.find(s => s.id === ex.id));
     if (candidates.length > 0) {
       selectedDefs.push(getRandomItems(candidates, 1)[0]);
     }
@@ -60,14 +71,19 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
 
   // Fill remaining slots
   while (selectedDefs.length < targetExercises) {
-    const remaining = availableExercises.filter(ex => !selectedDefs.find(s => s.id === ex.id));
+    const remaining = prioritizedExercises.filter(ex => !selectedDefs.find(s => s.id === ex.id));
     if (remaining.length === 0) break; 
-    selectedDefs.push(getRandomItems(remaining, 1)[0]);
+    // If physique goal, just take the top remaining from sorted list, else random
+    if (profile.primaryGoal === 'Physique Goal') {
+       selectedDefs.push(remaining[0]);
+    } else {
+       selectedDefs.push(getRandomItems(remaining, 1)[0]);
+    }
   }
 
   // 5. Build WorkoutSession Object
   const exercises: WorkoutExercise[] = selectedDefs.map(def => {
-    // Adjust sets/reps based on goals (Simplified)
+    // Adjust sets/reps based on goals
     let sets = def.defaultSets;
     let reps = def.defaultReps;
 
@@ -76,6 +92,16 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
       reps = Math.max(5, def.defaultReps - 4);
     } else if (profile.primaryGoal === 'Improve Endurance' && def.movementType === 'repetition') {
       reps = def.defaultReps + 5;
+    } else if (profile.primaryGoal === 'Physique Goal' && profile.physiqueAnalysis && def.movementType === 'repetition') {
+      // Analyze emphasis
+      const emphasisStr = profile.physiqueAnalysis.trainingEmphasis.join(' ').toLowerCase();
+      if (emphasisStr.includes('hypertrophy') || emphasisStr.includes('muscle')) {
+         sets = 4;
+         reps = 10;
+      } else if (emphasisStr.includes('strength')) {
+         sets = 5;
+         reps = 6;
+      }
     }
 
     const generatedSets = Array(sets).fill(null).map((_, i) => ({

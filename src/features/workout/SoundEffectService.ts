@@ -60,6 +60,13 @@ export class SoundEffectService {
     this.playTone(400, 'square', 0.1, 0.05);
   }
 
+  // Error / Invalid action
+  public static playError() {
+    if (!this.enabled) return;
+    this.playTone(200, 'sawtooth', 0.15, 0.1);
+    setTimeout(() => this.playTone(150, 'sawtooth', 0.2, 0.1), 150);
+  }
+
   // Set Complete confirmation
   public static playConfirm() {
     if (!this.enabled) return;
