@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
+import { useProgressStore } from '../../store/useProgressStore';
 import type { WorkoutSession } from '../../store/useWorkoutStore';
 import { useSchedulerStore } from '../../store/useSchedulerStore';
 import { generateWorkout } from '../workout/workoutGenerator';
@@ -37,7 +38,7 @@ export const Workout: React.FC = () => {
   const { weeklySchedule, updateDayStatus, notificationsEnabled } = useSchedulerStore();
   
   const [proposedWorkout, setProposedWorkout] = useState<WorkoutSession | null>(null);
-  const [viewState, setViewState] = useState<'overview' | 'active' | 'rest' | 'summary'>('overview');
+  const [viewState, setViewState] = useState<'overview' | 'active' | 'rest' | 'summary' | 'capture'>('overview');
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [currentSetIndex, setCurrentSetIndex] = useState(0);
   
@@ -49,6 +50,63 @@ export const Workout: React.FC = () => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [isTrackingReady, setIsTrackingReady] = useState(false);
+
+  const { addPhoto } = useProgressStore();
+  const [targetedPhotoStatus, setTargetedPhotoStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [generalPhotoStatus, setGeneralPhotoStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
+  const handleCapturePhoto = (event: React.ChangeEvent<HTMLInputElement>, type: 'TARGETED_MUSCLE' | 'GENERAL_STANDING') => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (type === 'TARGETED_MUSCLE') setTargetedPhotoStatus('saving');
+    else setGeneralPhotoStatus('saving');
+    setCaptureError(null);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_WIDTH = 800;
+        const scaleSize = MAX_WIDTH / img.width;
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+          
+          const workout = displayWorkout;
+          if (workout) {
+            addPhoto({
+              id: `photo_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+              workoutSessionId: workout.id,
+              date: new Date().toISOString(),
+              timestamp: Date.now(),
+              photoType: type,
+              muscleGroups: type === 'TARGETED_MUSCLE' ? (workout.targetMuscles || []) : [],
+              imageUri: compressedBase64,
+              workoutName: workout.workoutName
+            });
+            
+            HapticService.confirm();
+            SoundEffectService.playNotification();
+            
+            if (type === 'TARGETED_MUSCLE') setTargetedPhotoStatus('saved');
+            else setGeneralPhotoStatus('saved');
+            
+            SystemVoiceService.announceCustom("Progress record saved.", 200);
+          }
+        }
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     SoundEffectService.setEnabled(soundsEnabled);
@@ -214,7 +272,7 @@ export const Workout: React.FC = () => {
     );
   }
 
-  const displayWorkout = activeWorkout || proposedWorkout;
+  const displayWorkout = activeWorkout || proposedWorkout || ((viewState === 'summary' || viewState === 'capture') ? workoutHistory[0] : null);
 
   if (!displayWorkout) {
     return (
@@ -706,9 +764,8 @@ export const Workout: React.FC = () => {
           onClick={() => { 
             HapticService.light();
             SoundEffectService.playButton();
-            SystemVoiceService.endSession(); // Strict session teardown when leaving
-            setViewState('overview'); 
-            setProposedWorkout(null); 
+            setViewState('capture'); 
+            SystemVoiceService.announceCustom("Progress capture ready.", 200);
           }}
           style={{
             width: '100%', padding: '16px', backgroundColor: 'transparent', 
@@ -716,7 +773,110 @@ export const Workout: React.FC = () => {
             fontFamily: 'var(--font-system)', fontSize: '1.1rem', cursor: 'pointer'
           }}
         >
-          RETURN TO BASE
+          CONTINUE
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderCapture = () => (
+    <div className={styles.systemOuterFrame} style={{ minHeight: '70vh', textAlign: 'center', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {renderSensoryControls()}
+      <div className={styles.statusTitleBox} style={{ color: 'var(--accent-cyan)', borderColor: 'var(--accent-cyan)' }}>
+        PROGRESS CAPTURE
+      </div>
+      
+      <div className={styles.labelDim} style={{ marginTop: '24px', marginBottom: '8px' }}>TRAINING DATA RECORDED</div>
+      <h2 className="system-title" style={{ fontSize: '1.5rem', marginBottom: '32px' }}>
+        {displayWorkout?.workoutName}
+      </h2>
+
+      {captureError && (
+        <div style={{ padding: '12px', background: 'rgba(255,0,0,0.1)', color: 'var(--accent-alert)', border: '1px solid var(--accent-alert)', marginBottom: '24px', fontSize: '0.9rem' }}>
+          {captureError}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', marginBottom: '40px' }}>
+        {/* TARGETED CAPTURE */}
+        <div style={{ border: '1px solid var(--border-thin)', padding: '16px', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
+          <div className={styles.labelDim} style={{ marginBottom: '8px' }}>TARGETED PROGRESS</div>
+          <div style={{ color: 'var(--accent-cyan)', fontSize: '0.9rem', marginBottom: '16px' }}>
+            {displayWorkout?.targetMuscles?.join(' • ') || 'FULL BODY'}
+          </div>
+          
+          {targetedPhotoStatus === 'saved' ? (
+             <div style={{ padding: '12px', color: '#10b981', border: '1px solid #10b981' }}>TARGETED PROGRESS SAVED</div>
+          ) : (
+            <>
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                id="capture-targeted" 
+                style={{ display: 'none' }}
+                onChange={(e) => handleCapturePhoto(e, 'TARGETED_MUSCLE')} 
+                disabled={targetedPhotoStatus === 'saving'}
+              />
+              <label htmlFor="capture-targeted" style={{
+                display: 'block', width: '100%', padding: '12px', backgroundColor: 'rgba(0, 240, 255, 0.1)', 
+                border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', 
+                fontFamily: 'var(--font-system)', fontSize: '1rem', cursor: 'pointer'
+              }}>
+                {targetedPhotoStatus === 'saving' ? '[ SAVING... ]' : '[ TAKE TARGETED PHOTO ]'}
+              </label>
+            </>
+          )}
+        </div>
+
+        {/* GENERAL CAPTURE */}
+        <div style={{ border: '1px solid var(--border-thin)', padding: '16px', backgroundColor: 'rgba(15, 23, 42, 0.4)' }}>
+          <div className={styles.labelDim} style={{ marginBottom: '8px' }}>GENERAL PROGRESS</div>
+          <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
+            Use a consistent standing position.
+          </div>
+          
+          {generalPhotoStatus === 'saved' ? (
+             <div style={{ padding: '12px', color: '#10b981', border: '1px solid #10b981' }}>GENERAL PROGRESS SAVED</div>
+          ) : (
+            <>
+              <input 
+                type="file" 
+                accept="image/*" 
+                capture="environment" 
+                id="capture-general" 
+                style={{ display: 'none' }}
+                onChange={(e) => handleCapturePhoto(e, 'GENERAL_STANDING')} 
+                disabled={generalPhotoStatus === 'saving'}
+              />
+              <label htmlFor="capture-general" style={{
+                display: 'block', width: '100%', padding: '12px', backgroundColor: 'transparent', 
+                border: '1px solid var(--text-secondary)', color: 'var(--text-primary)', 
+                fontFamily: 'var(--font-system)', fontSize: '1rem', cursor: 'pointer'
+              }}>
+                {generalPhotoStatus === 'saving' ? '[ SAVING... ]' : '[ TAKE STANDING PHOTO ]'}
+              </label>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 'auto' }}>
+        <button 
+          onClick={() => { 
+            HapticService.light();
+            SoundEffectService.playButton();
+            setViewState('overview'); 
+            setProposedWorkout(null); 
+            SystemVoiceService.endSession(); // End session after complete flow
+          }}
+          style={{
+            width: '100%', padding: '16px', backgroundColor: 'transparent', 
+            border: 'none', color: 'var(--text-dim)', 
+            fontFamily: 'var(--font-system)', fontSize: '1rem', cursor: 'pointer'
+          }}
+        >
+          [ FINISH & RETURN TO BASE ]
         </button>
       </div>
     </div>
@@ -738,6 +898,7 @@ export const Workout: React.FC = () => {
       {viewState === 'active' && renderActive()}
       {viewState === 'rest' && renderRest()}
       {viewState === 'summary' && renderSummary()}
+      {viewState === 'capture' && renderCapture()}
     </div>
   );
 };

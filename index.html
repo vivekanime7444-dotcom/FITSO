@@ -19,6 +19,19 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // CRITICAL RECOVERY: Force clear any broken Phase 8 service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+            console.log('ServiceWorker unregistered for recovery');
+          }
+        }).catch(function(err) {
+          console.error('ServiceWorker unregistration failed: ', err);
+        });
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
