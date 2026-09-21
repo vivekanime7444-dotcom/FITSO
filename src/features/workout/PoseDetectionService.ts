@@ -58,17 +58,32 @@ export class PoseDetectionService {
     return this.initPromise;
   }
 
-  public async startCamera(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> {
+  public async startCamera(video: HTMLVideoElement, canvas: HTMLCanvasElement, onStateChange?: (state: string) => void): Promise<void> {
     this.stopCamera(); // Ensure clean state before starting
 
     this.videoElement = video;
     this.canvasElement = canvas;
 
+    if (onStateChange) onStateChange('REQUESTING_PERMISSION');
     try {
-      this.cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "user" }, width: 640, height: 480, frameRate: { ideal: 30 } }
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("MediaDevices API not available");
+      }
+
+      try {
+        this.cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "user" }, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
+        });
+      } catch (err: any) {
+        if (err.name === 'OverconstrainedError' || err.name === 'NotSupportedError') {
+          this.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        } else {
+          throw err;
+        }
+      }
       
+      if (onStateChange) onStateChange('PERMISSION_GRANTED');
+
       // If stopCamera was called while waiting for permission, abort safely
       if (!this.videoElement) {
         this.cameraStream.getTracks().forEach(t => t.stop());
@@ -76,13 +91,49 @@ export class PoseDetectionService {
         return;
       }
 
+      if (onStateChange) onStateChange('INITIALIZING_CAMERA');
+
       video.srcObject = this.cameraStream;
-      // Prevent multiple listeners
-      video.removeEventListener("loadeddata", this.predictWebcam);
-      video.addEventListener("loadeddata", this.predictWebcam);
-      await video.play();
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+
+      await new Promise<void>((resolve, reject) => {
+        let attempts = 0;
+        const checkReady = () => {
+          if (!this.videoElement) {
+            reject(new Error("Video element destroyed during initialization"));
+            return;
+          }
+          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            resolve();
+          } else {
+            attempts++;
+            if (attempts > 50) { // 5 seconds
+              reject(new Error("Camera initialization timeout (no dimensions)"));
+            } else {
+              setTimeout(checkReady, 100);
+            }
+          }
+        };
+        video.onloadedmetadata = () => {
+           video.play().catch(e => console.warn("Video play error", e));
+        };
+        setTimeout(checkReady, 100);
+      });
+
+      if (onStateChange) onStateChange('VIDEO_READY');
+
+      if (onStateChange) onStateChange('POSE_INITIALIZING');
+      await this.initialize();
+      if (onStateChange) onStateChange('POSE_READY');
+
+      this.predictWebcam();
+      if (onStateChange) onStateChange('TRACKING');
+
     } catch (err) {
       console.error("Camera access denied or unavailable", err);
+      if (onStateChange) onStateChange('ERROR');
       throw err;
     }
   }
@@ -93,7 +144,6 @@ export class PoseDetectionService {
       this.cameraStream = null;
     }
     if (this.videoElement) {
-      this.videoElement.removeEventListener("loadeddata", this.predictWebcam);
       this.videoElement.srcObject = null;
       this.videoElement = null;
     }

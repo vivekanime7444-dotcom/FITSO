@@ -49,7 +49,8 @@ export const Workout: React.FC = () => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [isTrackingReady, setIsTrackingReady] = useState(false);
+  const [cameraState, setCameraState] = useState<string>('IDLE');
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const { addPhoto } = useProgressStore();
   const [targetedPhotoStatus, setTargetedPhotoStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -118,11 +119,6 @@ export const Workout: React.FC = () => {
 
   // Strict cleanup on unmount
   useEffect(() => {
-    // Initialize pose engine
-    PoseDetectionService.getInstance().initialize().then(() => {
-      setIsTrackingReady(true);
-    });
-
     return () => {
       SystemVoiceService.endSession();
       PoseDetectionService.getInstance().stopCamera();
@@ -195,7 +191,7 @@ export const Workout: React.FC = () => {
 
   // AI Camera tracking lifecycle
   useEffect(() => {
-    if (viewState === 'active' && activeWorkout && cameraEnabled && isTrackingReady) {
+    if (viewState === 'active' && activeWorkout && cameraEnabled) {
       const currentEx = activeWorkout.exercises[currentExerciseIndex];
       const currentSet = currentEx.sets[currentSetIndex];
       const def = getExerciseById(currentEx.exerciseId);
@@ -243,9 +239,21 @@ export const Workout: React.FC = () => {
           }
         };
 
-        poseService.startCamera(videoRef.current, canvasRef.current).catch(err => {
+        poseService.startCamera(videoRef.current, canvasRef.current, (state) => {
+           setCameraState(state);
+           if (state === 'ERROR') {
+              setCameraError('Camera access denied or initialization failed.');
+           } else {
+              setCameraError(null);
+           }
+        }).catch(err => {
           console.error("Camera failed to start", err);
+          setCameraState('ERROR');
+          setCameraError(err.message || 'Camera initialization failed.');
         });
+      } else if (!isSupported) {
+         setCameraState('IDLE');
+         setCameraError(null);
       }
 
       return () => {
@@ -253,11 +261,13 @@ export const Workout: React.FC = () => {
         poseService.onPoseDetected = null;
         engine.onStateChange = null;
         engine.onRepComplete = null;
+        setCameraState('STOPPED');
       };
     } else {
       PoseDetectionService.getInstance().stopCamera();
+      setCameraState('IDLE');
     }
-  }, [viewState, activeWorkout, currentExerciseIndex, currentSetIndex, cameraEnabled, isTrackingReady]);
+  }, [viewState, activeWorkout, currentExerciseIndex, currentSetIndex, cameraEnabled]);
 
   if (!profile.isCompleted) {
     return (
@@ -622,7 +632,7 @@ export const Workout: React.FC = () => {
         </h2>
 
         {/* Camera Tracking UI */}
-        {cameraEnabled && isTrackingReady && (
+        {cameraEnabled && (
           <div style={{ 
             position: 'relative', width: '100%', aspectRatio: '4/3', 
             backgroundColor: '#000', borderRadius: '12px', overflow: 'hidden', 
@@ -630,23 +640,48 @@ export const Workout: React.FC = () => {
           }}>
             <video 
               ref={videoRef} 
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', zIndex: 1, visibility: ['TRACKING', 'POSE_READY', 'VIDEO_READY', 'POSE_INITIALIZING'].includes(cameraState) ? 'visible' : 'hidden' }} 
               playsInline muted 
             />
             <canvas 
               ref={canvasRef} 
-              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} 
+              style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)', zIndex: 2, pointerEvents: 'none' }} 
             />
             
+            {/* Loading/Error Overlays (zIndex 3) */}
+            {cameraState !== 'TRACKING' && (
+              <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 3, backgroundColor: 'rgba(0,0,0,0.7)', color: 'var(--text-primary)', textAlign: 'center', padding: '24px' }}>
+                {cameraState === 'ERROR' ? (
+                  <>
+                    <CameraOff size={32} style={{ color: 'var(--accent-alert)', marginBottom: '16px' }} />
+                    <div style={{ color: 'var(--accent-alert)', fontWeight: 'bold', marginBottom: '8px' }}>CAMERA ACCESS FAILED</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{cameraError || 'Please allow camera permission to track movement.'}</div>
+                  </>
+                ) : cameraState === 'REQUESTING_PERMISSION' ? (
+                  <>
+                    <Camera size={32} style={{ color: 'var(--accent-cyan)', marginBottom: '16px' }} />
+                    <div style={{ color: 'var(--accent-cyan)', fontWeight: 'bold', marginBottom: '8px' }}>CAMERA ACCESS REQUIRED</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Camera permission is required for movement tracking.</div>
+                  </>
+                ) : (
+                  <>
+                    <div className="pulse-anim" style={{ color: 'var(--accent-cyan)', marginBottom: '16px' }}>[ INITIALIZING ]</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{cameraState.replace(/_/g, ' ')}...</div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Tracking Status Overlay */}
-            <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '8px' }}>
+            <div style={{ position: 'absolute', top: '8px', left: '8px', display: 'flex', gap: '8px', zIndex: 4 }}>
               <div style={{ background: 'rgba(0,0,0,0.6)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', color: analysisResult?.trackingStatus === 'PAUSED' ? 'var(--accent-red)' : analysisResult?.trackingStatus === 'DEGRADED' ? 'var(--accent-yellow)' : 'var(--accent-cyan)' }}>
                 {analysisResult?.state === 'NOT_READY' ? 'WAITING FOR POSITION' : `TRACKING: ${analysisResult?.trackingStatus || 'UNKNOWN'}`}
               </div>
             </div>
 
             {/* Diagnostics overlay (dev mode hidden normally, but we show basic info) */}
-            <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', padding: '8px', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--text-dim)', textAlign: 'right' }}>
+            <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.7)', padding: '8px', borderRadius: '4px', fontSize: '0.6rem', color: 'var(--text-dim)', textAlign: 'right', zIndex: 4 }}>
+              <div style={{ color: 'var(--accent-cyan)' }}>SYS: {cameraState}</div>
               <div>ORIENT: {analysisResult?.orientation || 'UNKNOWN'}</div>
               <div>POSTURE: {analysisResult?.posture || 'UNKNOWN'}</div>
               <div>SIDE: {analysisResult?.primarySide || 'BOTH'}</div>
