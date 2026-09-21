@@ -9,10 +9,11 @@ export const generateWeeklySplit = (profile: UserProfile): TrainingDayPlan[] => 
 
   let splitSequence: Omit<TrainingDayPlan, 'dayOfWeek' | 'isRestDay'>[] = [];
 
+  const activeAnalysis = profile.physiqueReferences?.find(r => r.id === profile.currentPhysiqueReferenceId);
+
   // Determine the sequence of training protocols based on frequency
-  if (profile.physiqueAnalysis && profile.physiqueAnalysis.muscleGroups) {
-    const analysis = profile.physiqueAnalysis;
-    const focusMuscles = analysis.muscleGroups.length > 0 ? analysis.muscleGroups : ['Full Body'];
+  if (activeAnalysis && activeAnalysis.muscleGroups) {
+    const focusMuscles = activeAnalysis.muscleGroups.length > 0 ? activeAnalysis.muscleGroups : ['Full Body'];
     
     // Dynamic split based on AI analysis
     if (count <= 2) {

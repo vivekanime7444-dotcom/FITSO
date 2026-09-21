@@ -6,8 +6,10 @@ export type PrimaryGoal = 'Build Muscle' | 'Build Strength' | 'Improve Endurance
 export type Equipment = 'No Equipment' | 'Pull-up Bar' | 'Dip Bar' | 'Dumbbells' | 'Barbell' | 'Bench' | 'Resistance Bands' | 'Kettlebell' | 'Cable Machine' | 'Custom / Other';
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
 
-export interface PhysiqueAnalysis {
-  referenceId: string;
+export interface PhysiqueReference {
+  id: string; // The referenceId returned from analysis
+  imageUri: string;
+  createdAt: string;
   imageQuality: 'good' | 'acceptable' | 'poor' | 'unknown';
   trainingEmphasis: string[];
   muscleGroups: string[];
@@ -25,7 +27,8 @@ export interface UserProfile {
   trainingDaysCount: string;
   trainingDays: DayOfWeek[];
   preferredWorkoutTime: string; // e.g. "18:00"
-  physiqueAnalysis: PhysiqueAnalysis | null;
+  physiqueReferences: PhysiqueReference[];
+  currentPhysiqueReferenceId: string | null;
   createdAt?: string;
   isCompleted: boolean;
 }
@@ -48,7 +51,8 @@ const initialProfile: UserProfile = {
   trainingDaysCount: '',
   trainingDays: [],
   preferredWorkoutTime: '',
-  physiqueAnalysis: null,
+  physiqueReferences: [],
+  currentPhysiqueReferenceId: null,
   isCompleted: false,
 };
 

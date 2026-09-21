@@ -48,10 +48,12 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
 
   let selectedDefs: ExerciseDef[] = [];
   
+  const activeAnalysis = profile.physiqueReferences?.find(r => r.id === profile.currentPhysiqueReferenceId);
+
   // If Physique Goal, prioritize exercises that match the recommended categories/muscles
   let prioritizedExercises = availableExercises;
-  if (profile.primaryGoal === 'Physique Goal' && profile.physiqueAnalysis) {
-    const { muscleGroups, recommendedExerciseCategories } = profile.physiqueAnalysis;
+  if (profile.primaryGoal === 'Physique Goal' && activeAnalysis) {
+    const { muscleGroups, recommendedExerciseCategories } = activeAnalysis;
     prioritizedExercises = availableExercises.sort((a, b) => {
        const aMatch = muscleGroups.includes(a.muscleGroup) || recommendedExerciseCategories.some(c => a.name.toLowerCase().includes(c.toLowerCase())) ? 1 : 0;
        const bMatch = muscleGroups.includes(b.muscleGroup) || recommendedExerciseCategories.some(c => b.name.toLowerCase().includes(c.toLowerCase())) ? 1 : 0;
@@ -92,9 +94,9 @@ export const generateWorkout = (profile: UserProfile): WorkoutSession | null => 
       reps = Math.max(5, def.defaultReps - 4);
     } else if (profile.primaryGoal === 'Improve Endurance' && def.movementType === 'repetition') {
       reps = def.defaultReps + 5;
-    } else if (profile.primaryGoal === 'Physique Goal' && profile.physiqueAnalysis && def.movementType === 'repetition') {
+    } else if (profile.primaryGoal === 'Physique Goal' && activeAnalysis && def.movementType === 'repetition') {
       // Analyze emphasis
-      const emphasisStr = profile.physiqueAnalysis.trainingEmphasis.join(' ').toLowerCase();
+      const emphasisStr = activeAnalysis.trainingEmphasis.join(' ').toLowerCase();
       if (emphasisStr.includes('hypertrophy') || emphasisStr.includes('muscle')) {
          sets = 4;
          reps = 10;

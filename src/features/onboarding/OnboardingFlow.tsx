@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProfileStore, type UserProfile } from '../../store/useProfileStore';
+import { useProfileStore, type UserProfile, type PhysiqueReference } from '../../store/useProfileStore';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { SelectableCard } from '../../components/ui/SelectableCard';
@@ -173,6 +173,7 @@ export const OnboardingFlow: React.FC = () => {
   const [physiqueImage, setPhysiqueImage] = useState<string | null>(null);
   const [physiqueError, setPhysiqueError] = useState<string>('');
   const [physiqueDiagnostic, setPhysiqueDiagnostic] = useState<any>(null);
+  const [isChangingReference, setIsChangingReference] = useState(false);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -243,20 +244,27 @@ export const OnboardingFlow: React.FC = () => {
 
     // Valid Reference -> Analysis Complete
     setPhysiqueState('VALID_REFERENCE');
-    updateLocal({ 
-      physiqueAnalysis: {
-        referenceId: id,
-        imageQuality: result.imageQuality,
-        trainingEmphasis: result.trainingAnalysis?.trainingEmphasis || [],
-        muscleGroups: result.trainingAnalysis?.muscleGroups || [],
-        recommendedExerciseCategories: result.trainingAnalysis?.recommendedExerciseCategories || []
-      }
+    
+    const newRef: PhysiqueReference = {
+      id: id,
+      imageUri: physiqueImage, // The base64 data
+      createdAt: new Date().toISOString(),
+      imageQuality: result.imageQuality,
+      trainingEmphasis: result.trainingAnalysis?.trainingEmphasis || [],
+      muscleGroups: result.trainingAnalysis?.muscleGroups || [],
+      recommendedExerciseCategories: result.trainingAnalysis?.recommendedExerciseCategories || []
+    };
+    
+    updateLocal({
+      physiqueReferences: [newRef, ...localProfile.physiqueReferences],
+      currentPhysiqueReferenceId: id
     });
     
     setTimeout(() => {
        setPhysiqueState('ANALYSIS_COMPLETE');
        HapticService.confirm();
        SoundEffectService.playConfirm();
+       setIsChangingReference(false);
     }, 1500);
   };
 
@@ -268,9 +276,10 @@ export const OnboardingFlow: React.FC = () => {
 
   const renderGoal = () => {
     const isPhysique = localProfile.primaryGoal === 'Physique Goal';
+    const hasCurrentRef = !!localProfile.currentPhysiqueReferenceId;
     
     let isValid = localProfile.primaryGoal !== '';
-    if (isPhysique && physiqueState !== 'ANALYSIS_COMPLETE') {
+    if (isPhysique && !hasCurrentRef && physiqueState !== 'ANALYSIS_COMPLETE') {
       isValid = false;
     }
 
@@ -293,6 +302,7 @@ export const OnboardingFlow: React.FC = () => {
                 updateLocal({ primaryGoal: goal });
                 if (goal !== 'Physique Goal') {
                   resetPhysiqueFlow();
+                  setIsChangingReference(false);
                 }
               }}
             />
@@ -301,68 +311,146 @@ export const OnboardingFlow: React.FC = () => {
 
         {isPhysique && (
           <div style={{ marginTop: '24px', padding: '16px', border: '1px solid var(--accent-cyan)', backgroundColor: 'rgba(0, 240, 255, 0.05)', borderRadius: '8px' }}>
-            <h3 style={{ color: 'var(--accent-cyan)', marginBottom: '8px', fontSize: '1rem', letterSpacing: '2px' }}>PHYSIQUE REFERENCE</h3>
+            <h3 style={{ color: 'var(--accent-cyan)', marginBottom: '16px', fontSize: '1rem', letterSpacing: '2px' }}>PHYSIQUE REFERENCE</h3>
             
-            {physiqueState === 'IDLE' && (
-               <div>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>Upload a clear training/physique reference image.</p>
-                  <label style={{ display: 'block', padding: '12px', textAlign: 'center', border: '1px dashed var(--accent-cyan)', cursor: 'pointer', color: 'var(--accent-cyan)' }}>
-                     [ UPLOAD REFERENCE IMAGE ]
-                     <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-                  </label>
-               </div>
-            )}
-
-            {physiqueState === 'IMAGE_SELECTED' && (
+            {hasCurrentRef && !isChangingReference ? (
+              // SHOW CURRENT REFERENCE AND HISTORY
               <div>
-                <img src={physiqueImage!} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', marginBottom: '16px', borderRadius: '4px' }} />
-                <Button onClick={validateImage} variant="primary" style={{ width: '100%', marginBottom: '8px' }}>ANALYZE IMAGE</Button>
-                <Button onClick={resetPhysiqueFlow} variant="ghost" style={{ width: '100%' }}>CANCEL</Button>
-              </div>
-            )}
+                {/* Current Reference */}
+                <div style={{ marginBottom: '24px' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>CURRENT REFERENCE</div>
+                  {(() => {
+                    const currentRef = localProfile.physiqueReferences.find(r => r.id === localProfile.currentPhysiqueReferenceId);
+                    if (!currentRef) return null;
+                    return (
+                      <div style={{ border: '1px solid var(--accent-cyan)', padding: '8px', borderRadius: '4px', backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                        <img src={currentRef.imageUri} alt="Current reference" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', borderRadius: '4px', marginBottom: '8px' }} />
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                          <strong>Emphasis:</strong> {currentRef.trainingEmphasis.join(', ')}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  <Button 
+                    onClick={() => {
+                      setIsChangingReference(true);
+                      resetPhysiqueFlow();
+                    }} 
+                    variant="outline" 
+                    style={{ width: '100%', marginTop: '12px' }}
+                  >
+                    CHANGE REFERENCE
+                  </Button>
+                </div>
 
-            {physiqueState === 'VALIDATING_REFERENCE' && (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <div className="pulse-anim" style={{ color: 'var(--accent-cyan)', marginBottom: '8px' }}>[ SCANNING IMAGE ]</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Validating physique reference...</p>
+                {/* History */}
+                {localProfile.physiqueReferences.length > 1 && (
+                  <div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>REFERENCE HISTORY</div>
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                      {localProfile.physiqueReferences.map(ref => {
+                        const isCurrent = ref.id === localProfile.currentPhysiqueReferenceId;
+                        return (
+                          <div 
+                            key={ref.id}
+                            onClick={() => {
+                              if (!isCurrent) {
+                                HapticService.selection();
+                                SoundEffectService.playClick();
+                                updateLocal({ currentPhysiqueReferenceId: ref.id });
+                              }
+                            }}
+                            style={{ 
+                              minWidth: '80px', 
+                              width: '80px', 
+                              cursor: isCurrent ? 'default' : 'pointer',
+                              opacity: isCurrent ? 1 : 0.6,
+                              border: isCurrent ? '2px solid var(--accent-cyan)' : '1px solid var(--border-thin)',
+                              borderRadius: '4px',
+                              overflow: 'hidden'
+                            }}
+                          >
+                            <img src={ref.imageUri} alt="History reference" style={{ width: '100%', height: '80px', objectFit: 'cover' }} />
+                            <div style={{ fontSize: '0.6rem', textAlign: 'center', padding: '4px', backgroundColor: 'var(--bg-surface)' }}>
+                              {new Date(ref.createdAt).toLocaleDateString()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            ) : (
+              // UPLOAD/VALIDATE FLOW
+              <div>
+                {physiqueState === 'IDLE' && (
+                   <div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>Upload a clear training/physique reference image.</p>
+                      <label style={{ display: 'block', padding: '12px', textAlign: 'center', border: '1px dashed var(--accent-cyan)', cursor: 'pointer', color: 'var(--accent-cyan)' }}>
+                         [ UPLOAD REFERENCE IMAGE ]
+                         <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+                      </label>
+                      {hasCurrentRef && (
+                        <Button onClick={() => setIsChangingReference(false)} variant="ghost" style={{ width: '100%', marginTop: '12px' }}>CANCEL</Button>
+                      )}
+                   </div>
+                )}
 
-            {(physiqueState === 'INVALID_REFERENCE' || physiqueState === 'IMAGE_QUALITY_LOW' || physiqueState === 'ERROR') && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: 'var(--accent-alert)', marginBottom: '8px', fontWeight: 'bold' }}>REFERENCE REJECTED</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>{physiqueError}</p>
-                <Button onClick={resetPhysiqueFlow} variant="outline" style={{ width: '100%', borderColor: 'var(--accent-alert)', color: 'var(--accent-alert)' }}>
-                  [ UPLOAD ANOTHER IMAGE ]
-                </Button>
+                {physiqueState === 'IMAGE_SELECTED' && (
+                  <div>
+                    <img src={physiqueImage!} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain', marginBottom: '16px', borderRadius: '4px' }} />
+                    <Button onClick={validateImage} variant="primary" style={{ width: '100%', marginBottom: '8px' }}>ANALYZE IMAGE</Button>
+                    <Button onClick={resetPhysiqueFlow} variant="ghost" style={{ width: '100%' }}>CANCEL</Button>
+                  </div>
+                )}
+
+                {physiqueState === 'VALIDATING_REFERENCE' && (
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <div className="pulse-anim" style={{ color: 'var(--accent-cyan)', marginBottom: '8px' }}>[ SCANNING IMAGE ]</div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Validating physique reference...</p>
+                  </div>
+                )}
+
+                {(physiqueState === 'INVALID_REFERENCE' || physiqueState === 'IMAGE_QUALITY_LOW' || physiqueState === 'ERROR') && (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: 'var(--accent-alert)', marginBottom: '8px', fontWeight: 'bold' }}>REFERENCE REJECTED</div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '16px' }}>{physiqueError}</p>
+                    <Button onClick={resetPhysiqueFlow} variant="outline" style={{ width: '100%', borderColor: 'var(--accent-alert)', color: 'var(--accent-alert)', marginBottom: '8px' }}>
+                      [ UPLOAD ANOTHER IMAGE ]
+                    </Button>
+                    {hasCurrentRef && (
+                      <Button onClick={() => setIsChangingReference(false)} variant="ghost" style={{ width: '100%' }}>CANCEL</Button>
+                    )}
+                  </div>
+                )}
+
+                {physiqueState === 'VALID_REFERENCE' && (
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <div style={{ color: '#10b981', marginBottom: '8px', fontWeight: 'bold' }}>REFERENCE ACCEPTED</div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Extracting training emphasis...</p>
+                  </div>
+                )}
+
+                {physiqueState === 'ANALYSIS_COMPLETE' && (
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ color: '#10b981', marginBottom: '8px', fontWeight: 'bold' }}>ANALYSIS COMPLETE</div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
+                      Emphasis: {localProfile.physiqueReferences.find(r => r.id === localProfile.currentPhysiqueReferenceId)?.trainingEmphasis.join(', ')}
+                    </p>
+                  </div>
+                )}
+
+                {/* Development Diagnostics */}
+                {physiqueDiagnostic && (
+                  <details style={{ marginTop: '16px', fontSize: '0.7rem', color: 'var(--text-dim)', borderTop: '1px solid var(--border-thin)', paddingTop: '8px' }}>
+                    <summary style={{ cursor: 'pointer' }}>DEV DIAGNOSTICS</summary>
+                    <pre style={{ whiteSpace: 'pre-wrap', marginTop: '8px', overflowX: 'auto' }}>
+                      {JSON.stringify(physiqueDiagnostic, null, 2)}
+                    </pre>
+                  </details>
+                )}
               </div>
-            )}
-
-            {physiqueState === 'VALID_REFERENCE' && (
-              <div style={{ textAlign: 'center', padding: '24px 0' }}>
-                <div style={{ color: '#10b981', marginBottom: '8px', fontWeight: 'bold' }}>REFERENCE ACCEPTED</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Extracting training emphasis...</p>
-              </div>
-            )}
-
-            {physiqueState === 'ANALYSIS_COMPLETE' && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ color: '#10b981', marginBottom: '8px', fontWeight: 'bold' }}>ANALYSIS COMPLETE</div>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '16px' }}>
-                  Emphasis: {localProfile.physiqueAnalysis?.trainingEmphasis.join(', ')}
-                </p>
-                <Button onClick={resetPhysiqueFlow} variant="ghost" style={{ fontSize: '0.8rem' }}>CHANGE IMAGE</Button>
-              </div>
-            )}
-
-            {/* Development Diagnostics */}
-            {physiqueDiagnostic && (
-              <details style={{ marginTop: '16px', fontSize: '0.7rem', color: 'var(--text-dim)', borderTop: '1px solid var(--border-thin)', paddingTop: '8px' }}>
-                <summary style={{ cursor: 'pointer' }}>DEV DIAGNOSTICS</summary>
-                <pre style={{ whiteSpace: 'pre-wrap', marginTop: '8px', overflowX: 'auto' }}>
-                  {JSON.stringify(physiqueDiagnostic, null, 2)}
-                </pre>
-              </details>
             )}
           </div>
         )}
