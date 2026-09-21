@@ -66,7 +66,7 @@ export class PoseDetectionService {
 
     try {
       this.cameraStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: 640, height: 480, frameRate: { ideal: 30 } }
+        video: { facingMode: { ideal: "user" }, width: 640, height: 480, frameRate: { ideal: 30 } }
       });
       
       // If stopCamera was called while waiting for permission, abort safely

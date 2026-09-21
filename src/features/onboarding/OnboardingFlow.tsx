@@ -9,6 +9,7 @@ import { SoundEffectService } from '../workout/SoundEffectService';
 import { HapticService } from '../workout/HapticService';
 import { ChevronRight, ChevronLeft, Zap, Target, Dumbbell, Calendar, User } from 'lucide-react';
 import styles from './Onboarding.module.css';
+import { PhysiqueAnalysisService } from '../../services/PhysiqueAnalysisService';
 
 const STEPS = {
   INTRO: 0,
@@ -224,10 +225,6 @@ export const OnboardingFlow: React.FC = () => {
     HapticService.selection();
     SoundEffectService.playClick();
 
-    // Import dynamically to avoid top-level issues if needed, or static import at top.
-    // Assuming static import will be added to the top of the file
-    const { PhysiqueAnalysisService } = await import('../../services/PhysiqueAnalysisService');
-    
     const { id, result } = await PhysiqueAnalysisService.analyzeImage(physiqueImage);
     
     setPhysiqueDiagnostic({ id, result });

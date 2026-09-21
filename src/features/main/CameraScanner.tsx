@@ -73,7 +73,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ onClose }) => {
   
   useEffect(() => {
     // Start camera
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } } })
       .then(s => {
         setStream(s);
         if (videoRef.current) {
