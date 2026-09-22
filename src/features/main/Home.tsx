@@ -3,6 +3,8 @@ import { useProfileStore } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { useActivityStore } from '../../store/useActivityStore';
 import { useHabitStore } from '../../store/useHabitStore';
+import { useEXPStore } from '../../store/useEXPStore';
+import { EXPService } from '../progression/EXPService';
 import { StepTrackingService } from '../workout/StepTrackingService';
 import { User, Target, Calendar, Activity, Footprints, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +13,10 @@ import styles from './MainScreens.module.css';
 export const Home: React.FC = () => {
   const { profile } = useProfileStore();
   const { getTodayHabits } = useHabitStore();
+  const { currentLevel } = useEXPStore();
   const navigate = useNavigate();
+  
+  const expProgress = EXPService.getEXPProgress();
   
   const todayHabits = getTodayHabits().slice(0, 3); // Show max 3 on home
 
@@ -27,12 +32,19 @@ export const Home: React.FC = () => {
         {/* Level & Player Info */}
         <div className={styles.levelInfoSection}>
           <div className={styles.levelBlock}>
-            <div className={styles.levelNumber}>1</div>
+            <div className={styles.levelNumber}>{currentLevel}</div>
             <div className={styles.levelLabel}>LEVEL</div>
           </div>
-          <div className={styles.jobBlock}>
+          <div className={styles.jobBlock} style={{ flex: 1 }}>
             <div><span className={styles.labelDim}>PLAYER:</span> {profile.name.toUpperCase() || 'UNKNOWN'}</div>
             <div><span className={styles.labelDim}>CLASS:</span> {profile.experienceLevel.toUpperCase() || 'BEGINNER'}</div>
+            <div style={{ marginTop: '8px', width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
+               <div style={{ height: '100%', width: `${expProgress.progressPercentage}%`, background: 'var(--accent-cyan)' }}></div>
+            </div>
+            <div style={{ fontSize: '0.65rem', marginTop: '4px', color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between' }}>
+               <span>{expProgress.expIntoCurrentLevel} EXP</span>
+               <span>{expProgress.expNeededForNextLevel} EXP TO NEXT</span>
+            </div>
           </div>
         </div>
 

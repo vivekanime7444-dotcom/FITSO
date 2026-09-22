@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useHabitStore, getLocalISOString, getStartOfWeek, type Habit } from '../../store/useHabitStore';
 import { HapticService } from '../workout/HapticService';
 import { SoundEffectService } from '../workout/SoundEffectService';
-import { SystemVoiceService } from '../workout/SystemVoiceService';
+import { EXPService } from '../progression/EXPService';
 import { Plus, Check, Undo2, X, Activity, Calendar as CalendarIcon, Target } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
@@ -28,9 +28,7 @@ export const Habits: React.FC = () => {
 
     if (!completed) {
       setTimeout(() => {
-        HapticService.confirm();
-        SoundEffectService.playNotification();
-        SystemVoiceService.announceCustom("Habit completed.", 200);
+        EXPService.awardHabitEXP(habit.id, targetDate, habit.name);
       }, 150);
     }
   };

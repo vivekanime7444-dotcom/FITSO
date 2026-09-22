@@ -14,6 +14,7 @@ import { WorkoutSchedulerService } from '../workout/WorkoutSchedulerService';
 import { PoseDetectionService } from '../workout/PoseDetectionService';
 import { cameraService } from '../workout/CameraService';
 import { ExerciseAnalysisEngine } from '../workout/ExerciseAnalysisEngine';
+import { EXPService } from '../progression/EXPService';
 import { Play, Check, ChevronRight, Zap, ZapOff, Volume2, VolumeX, BellRing, FastForward, Timer, ShieldAlert, Camera, CameraOff } from 'lucide-react';
 import styles from './MainScreens.module.css';
 
@@ -349,6 +350,7 @@ export const Workout: React.FC = () => {
     setTimeout(() => {
       if (isLastSet && isLastExercise) {
         completeActiveWorkout();
+        EXPService.awardWorkoutEXP(activeWorkout.id, activeWorkout.workoutName);
         SystemVoiceService.endSession(); // End session immediately on completion
         setViewState('summary');
         SoundEffectService.playMissionComplete();

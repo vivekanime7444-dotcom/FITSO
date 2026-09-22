@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
+import { useEXPStore } from '../../store/useEXPStore';
+import { EXPService } from '../progression/EXPService';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { Download } from 'lucide-react';
@@ -7,6 +9,8 @@ import styles from './MainScreens.module.css';
 
 export const Profile: React.FC = () => {
   const { profile, resetProfile } = useProfileStore();
+  const { currentLevel, totalEXP } = useEXPStore();
+  const expProgress = EXPService.getEXPProgress();
   const navigate = useNavigate();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -55,6 +59,23 @@ export const Profile: React.FC = () => {
         </div>
 
         <div className={styles.statsSection}>
+          <h3 className={styles.statName} style={{ marginBottom: '16px', color: 'var(--accent-cyan)' }}>[ EXP & PROGRESSION ]</h3>
+          <div className={styles.jobBlock} style={{ borderLeft: 'none', paddingLeft: 0, gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '1.2rem' }}><span className={styles.labelDim}>LEVEL:</span> {currentLevel}</div>
+              <div style={{ fontSize: '1.2rem' }}><span className={styles.labelDim}>TOTAL EXP:</span> {totalEXP}</div>
+            </div>
+            
+            <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden', marginTop: '4px' }}>
+               <div style={{ height: '100%', width: `${expProgress.progressPercentage}%`, background: 'var(--accent-cyan)' }}></div>
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+               <span>{expProgress.expIntoCurrentLevel} EXP</span>
+               <span>{expProgress.expToNextLevel} EXP TO LEVEL {currentLevel + 1}</span>
+            </div>
+          </div>
+
           <h3 className={styles.statName} style={{ marginBottom: '16px' }}>[ CONFIGURATION ]</h3>
           <div className={styles.jobBlock} style={{ borderLeft: 'none', paddingLeft: 0, gap: '12px' }}>
             <div><span className={styles.labelDim}>GOAL:</span> {profile.primaryGoal}</div>
