@@ -2,12 +2,18 @@ import React from 'react';
 import { useProfileStore } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { useActivityStore } from '../../store/useActivityStore';
+import { useHabitStore } from '../../store/useHabitStore';
 import { StepTrackingService } from '../workout/StepTrackingService';
-import { User, Target, Calendar, Activity, Footprints } from 'lucide-react';
+import { User, Target, Calendar, Activity, Footprints, Check } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import styles from './MainScreens.module.css';
 
 export const Home: React.FC = () => {
   const { profile } = useProfileStore();
+  const { getTodayHabits } = useHabitStore();
+  const navigate = useNavigate();
+  
+  const todayHabits = getTodayHabits().slice(0, 3); // Show max 3 on home
 
   return (
     <div className={styles.screenContainer}>
@@ -87,6 +93,34 @@ export const Home: React.FC = () => {
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
              <span className={styles.statName} style={{display: 'block', marginBottom: '8px'}}>EQUIPMENT INVENTORY:</span>
              <span className={styles.statValue} style={{fontSize: '0.9rem'}}>{profile.equipment.join(', ').toUpperCase() || 'NONE'}</span>
+          </div>
+
+          <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>
+            <div className={styles.statusTitleBox} style={{ margin: '0 0 12px 0' }}>TODAY'S HABITS</div>
+            
+            {todayHabits.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '16px', color: 'var(--text-secondary)' }}>
+                 NO ACTIVE HABITS
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                {todayHabits.map(({ habit, completed }) => (
+                  <div key={habit.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', opacity: completed ? 0.6 : 1 }}>
+                    <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: completed ? '1px solid #10b981' : '1px solid var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+                      {completed && <Check size={14} />}
+                    </div>
+                    <span style={{ color: completed ? '#10b981' : 'var(--text-primary)' }}>{habit.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button 
+              onClick={() => navigate('/habits')}
+              style={{ width: '100%', padding: '12px', background: 'transparent', border: '1px solid var(--accent-cyan)', color: 'var(--accent-cyan)', fontSize: '0.9rem' }}
+            >
+              [ VIEW HABITS ]
+            </button>
           </div>
 
           <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-subtle)', paddingTop: '16px' }}>

@@ -76,6 +76,9 @@ export const Profile: React.FC = () => {
               INSTALL SYSTEM APP
             </Button>
           )}
+          <Button variant="outline" style={{ width: '100%', borderColor: 'var(--accent-cyan)', color: 'var(--accent-cyan)' }} onClick={() => navigate('/habits')}>
+            HABIT TRACKING
+          </Button>
           <Button variant="outline" style={{ width: '100%' }} onClick={() => navigate('/onboarding')}>EDIT CONFIGURATION</Button>
           <Button 
             variant="outline" 

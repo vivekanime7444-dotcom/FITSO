@@ -1,6 +1,7 @@
 import { useProfileStore } from '../../store/useProfileStore';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { useSchedulerStore, type WorkoutScheduleDay, type ScheduleStatus } from '../../store/useSchedulerStore';
+import { useHabitStore } from '../../store/useHabitStore';
 import { SystemVoiceService } from './SystemVoiceService';
 
 export class WorkoutSchedulerService {
@@ -118,28 +119,68 @@ export class WorkoutSchedulerService {
     this.checkAndFireReminder();
   }
 
+  private static firedHabits: Set<string> | null = null;
+  private static firedHabitsDate: string | null = null;
+
   private static checkAndFireReminder() {
     const profile = useProfileStore.getState().profile;
     const scheduler = useSchedulerStore.getState();
     
-    if (!scheduler.notificationsEnabled || !profile.preferredWorkoutTime) return;
+    if (!scheduler.notificationsEnabled) return;
 
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
+    const currentHour = today.getHours();
+    const currentMin = today.getMinutes();
     
-    // Don't fire twice in one day
-    if (this.lastNotificationDate === todayStr) return;
-
-    const todaySchedule = scheduler.weeklySchedule.find(d => d.date === todayStr);
-    if (!todaySchedule || todaySchedule.status === 'COMPLETED') return;
-
-    // Parse preferred time (e.g. "18:00")
-    const [prefHour, prefMin] = profile.preferredWorkoutTime.split(':').map(Number);
-    
-    if (today.getHours() === prefHour && today.getMinutes() === prefMin) {
-      this.fireNotification(todaySchedule);
-      this.lastNotificationDate = todayStr;
+    // 1. Check Workout Reminder
+    if (profile.preferredWorkoutTime && this.lastNotificationDate !== todayStr) {
+      const todaySchedule = scheduler.weeklySchedule.find(d => d.date === todayStr);
+      if (todaySchedule && todaySchedule.status !== 'COMPLETED') {
+        const [prefHour, prefMin] = profile.preferredWorkoutTime.split(':').map(Number);
+        if (currentHour === prefHour && currentMin === prefMin) {
+          this.fireNotification(todaySchedule);
+          this.lastNotificationDate = todayStr;
+        }
+      }
     }
+
+    // 2. Check Habit Reminders
+    const { getTodayHabits } = useHabitStore.getState();
+    const todayHabits = getTodayHabits();
+    
+    todayHabits.forEach(({ habit, completed }) => {
+      if (!completed && habit.reminderTime) {
+        const [hHour, hMin] = habit.reminderTime.split(':').map(Number);
+        if (currentHour === hHour && currentMin === hMin) {
+           if (!this.firedHabits) this.firedHabits = new Set();
+           if (this.firedHabitsDate !== todayStr) {
+               this.firedHabits.clear();
+               this.firedHabitsDate = todayStr;
+           }
+           if (!this.firedHabits.has(habit.id)) {
+               this.fireHabitNotification(habit);
+               this.firedHabits.add(habit.id);
+           }
+        }
+      }
+    });
+  }
+
+  private static fireHabitNotification(habit: any) {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    
+    new Notification('HABIT REMINDER', {
+      body: `It's time to: ${habit.name}`,
+      icon: '/sl_avatar.jpg',
+      badge: '/sl_avatar.jpg'
+    });
+    
+    SystemVoiceService.init();
+    const utterance = new SpeechSynthesisUtterance(`Reminder: ${habit.name}`);
+    utterance.pitch = 0.85; 
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
   }
 
   private static fireNotification(day: WorkoutScheduleDay) {

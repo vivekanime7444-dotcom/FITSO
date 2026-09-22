@@ -6,6 +6,7 @@ import { Home } from './features/main/Home';
 import { Workout } from './features/main/Workout';
 import { Nutrition } from './features/main/Nutrition';
 import { Profile } from './features/main/Profile';
+import { Habits } from './features/main/Habits';
 import { Activity } from './features/main/Activity';
 import { DevActivity } from './features/main/DevActivity';
 import { WorkoutSchedulerService } from './features/workout/WorkoutSchedulerService';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
           <Route path="dev-activity" element={<DevActivity />} />
           <Route path="nutrition" element={<Nutrition />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="habits" element={<Habits />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />
