@@ -12,6 +12,7 @@ import { SoundEffectService } from '../workout/SoundEffectService';
 import { SystemVoiceService } from '../workout/SystemVoiceService';
 import { WorkoutSchedulerService } from '../workout/WorkoutSchedulerService';
 import { PoseDetectionService } from '../workout/PoseDetectionService';
+import { cameraService } from '../workout/CameraService';
 import { ExerciseAnalysisEngine } from '../workout/ExerciseAnalysisEngine';
 import { Play, Check, ChevronRight, Zap, ZapOff, Volume2, VolumeX, BellRing, FastForward, Timer, ShieldAlert, Camera, CameraOff } from 'lucide-react';
 import styles from './MainScreens.module.css';
@@ -121,7 +122,8 @@ export const Workout: React.FC = () => {
   useEffect(() => {
     return () => {
       SystemVoiceService.endSession();
-      PoseDetectionService.getInstance().stopCamera();
+      PoseDetectionService.getInstance().stopTracking();
+      cameraService.stop();
     };
   }, []);
 
@@ -198,6 +200,7 @@ export const Workout: React.FC = () => {
       
       const engine = ExerciseAnalysisEngine.getInstance();
       const poseService = PoseDetectionService.getInstance();
+      const camService = cameraService;
 
       // Only start if exercise is supported (simple check for now)
       const isSupported = def && ['push-up', 'squat', 'lunge', 'curl'].some(k => def.name.toLowerCase().includes(k));
@@ -239,17 +242,22 @@ export const Workout: React.FC = () => {
           }
         };
 
-        poseService.startCamera(videoRef.current, canvasRef.current, (state) => {
+        poseService.onStateChange = (state, error) => {
+           setCameraState(state);
+           if (state === 'ERROR') setCameraError(error?.message || 'Pose Tracking Error');
+        };
+
+        camService.setOnStateChange((state, error) => {
            setCameraState(state);
            if (state === 'ERROR') {
-              setCameraError('Camera access denied or initialization failed.');
-           } else {
-              setCameraError(null);
+              setCameraError(error?.message || 'Camera initialization failed.');
+           } else if (state === 'VIDEO_READY') {
+              poseService.startTracking(videoRef.current!, canvasRef.current!);
            }
-        }).catch(err => {
-          console.error("Camera failed to start", err);
-          setCameraState('ERROR');
-          setCameraError(err.message || 'Camera initialization failed.');
+        });
+
+        camService.start(videoRef.current).catch(err => {
+           console.error("Camera pipeline failed", err);
         });
       } else if (!isSupported) {
          setCameraState('IDLE');
@@ -257,14 +265,16 @@ export const Workout: React.FC = () => {
       }
 
       return () => {
-        poseService.stopCamera();
+        poseService.stopTracking();
+        camService.stop();
         poseService.onPoseDetected = null;
         engine.onStateChange = null;
         engine.onRepComplete = null;
         setCameraState('STOPPED');
       };
     } else {
-      PoseDetectionService.getInstance().stopCamera();
+      PoseDetectionService.getInstance().stopTracking();
+      cameraService.stop();
       setCameraState('IDLE');
     }
   }, [viewState, activeWorkout, currentExerciseIndex, currentSetIndex, cameraEnabled]);
@@ -656,6 +666,12 @@ export const Workout: React.FC = () => {
                     <CameraOff size={32} style={{ color: 'var(--accent-alert)', marginBottom: '16px' }} />
                     <div style={{ color: 'var(--accent-alert)', fontWeight: 'bold', marginBottom: '8px' }}>CAMERA ACCESS FAILED</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{cameraError || 'Please allow camera permission to track movement.'}</div>
+                    <button 
+                      onClick={() => { cameraService.start(videoRef.current!); }} 
+                      style={{ marginTop: '16px', padding: '8px 16px', background: 'var(--accent-alert)', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                    >
+                      RETRY CAMERA
+                    </button>
                   </>
                 ) : cameraState === 'REQUESTING_PERMISSION' ? (
                   <>

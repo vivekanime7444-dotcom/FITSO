@@ -1,18 +1,27 @@
 import { PoseLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
 import { SkeletonVisualizationMapper } from './SkeletonVisualizationMapper';
 
+export type PoseState = 
+  | 'IDLE'
+  | 'POSE_INITIALIZING'
+  | 'POSE_READY'
+  | 'TRACKING'
+  | 'PAUSED'
+  | 'ERROR'
+  | 'STOPPED';
+
 export class PoseDetectionService {
   private static instance: PoseDetectionService;
   private poseLandmarker: PoseLandmarker | null = null;
   private isInitialized = false;
   private initPromise: Promise<void> | null = null;
-  private cameraStream: MediaStream | null = null;
   private videoElement: HTMLVideoElement | null = null;
   private canvasElement: HTMLCanvasElement | null = null;
   private activeRequestAnimationFrame: number | null = null;
   private visualMapper = new SkeletonVisualizationMapper();
+  private state: PoseState = 'IDLE';
   
-  // Callback when a new pose is detected
+  public onStateChange: ((state: PoseState, error?: any) => void) | null = null;
   public onPoseDetected: ((result: any, videoWidth: number, videoHeight: number) => void) | null = null;
 
   private constructor() {}
@@ -24,9 +33,16 @@ export class PoseDetectionService {
     return PoseDetectionService.instance;
   }
 
+  private updateState(newState: PoseState, error?: any) {
+    this.state = newState;
+    if (this.onStateChange) this.onStateChange(newState, error);
+  }
+
   public async initialize(): Promise<void> {
     if (this.isInitialized) return;
     if (this.initPromise) return this.initPromise;
+
+    this.updateState('POSE_INITIALIZING');
 
     this.initPromise = (async () => {
       try {
@@ -47,10 +63,12 @@ export class PoseDetectionService {
         });
 
         this.isInitialized = true;
+        this.updateState('POSE_READY');
         console.log("PoseLandmarker initialized successfully");
       } catch (error) {
         console.error("Failed to initialize PoseLandmarker", error);
         this.initPromise = null; // Allow retry on failure
+        this.updateState('ERROR', error);
         throw error;
       }
     })();
@@ -58,103 +76,42 @@ export class PoseDetectionService {
     return this.initPromise;
   }
 
-  public async startCamera(video: HTMLVideoElement, canvas: HTMLCanvasElement, onStateChange?: (state: string) => void): Promise<void> {
-    this.stopCamera(); // Ensure clean state before starting
+  // Accepts an ALREADY PLAYING and dimensions-validated video element
+  public async startTracking(video: HTMLVideoElement, canvas: HTMLCanvasElement): Promise<void> {
+    this.stopTracking(); 
 
     this.videoElement = video;
     this.canvasElement = canvas;
 
-    if (onStateChange) onStateChange('REQUESTING_PERMISSION');
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("MediaDevices API not available");
-      }
-
-      try {
-        this.cameraStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "user" }, width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }
-        });
-      } catch (err: any) {
-        if (err.name === 'OverconstrainedError' || err.name === 'NotSupportedError') {
-          this.cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-        } else {
-          throw err;
-        }
-      }
-      
-      if (onStateChange) onStateChange('PERMISSION_GRANTED');
-
-      // If stopCamera was called while waiting for permission, abort safely
-      if (!this.videoElement) {
-        this.cameraStream.getTracks().forEach(t => t.stop());
-        this.cameraStream = null;
-        return;
-      }
-
-      if (onStateChange) onStateChange('INITIALIZING_CAMERA');
-
-      video.srcObject = this.cameraStream;
-      video.muted = true;
-      video.playsInline = true;
-      video.autoplay = true;
-
-      await new Promise<void>((resolve, reject) => {
-        let attempts = 0;
-        const checkReady = () => {
-          if (!this.videoElement) {
-            reject(new Error("Video element destroyed during initialization"));
-            return;
-          }
-          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-            resolve();
-          } else {
-            attempts++;
-            if (attempts > 50) { // 5 seconds
-              reject(new Error("Camera initialization timeout (no dimensions)"));
-            } else {
-              setTimeout(checkReady, 100);
-            }
-          }
-        };
-        video.onloadedmetadata = () => {
-           video.play().catch(e => console.warn("Video play error", e));
-        };
-        setTimeout(checkReady, 100);
-      });
-
-      if (onStateChange) onStateChange('VIDEO_READY');
-
-      if (onStateChange) onStateChange('POSE_INITIALIZING');
+    if (!this.isInitialized) {
       await this.initialize();
-      if (onStateChange) onStateChange('POSE_READY');
-
-      this.predictWebcam();
-      if (onStateChange) onStateChange('TRACKING');
-
-    } catch (err) {
-      console.error("Camera access denied or unavailable", err);
-      if (onStateChange) onStateChange('ERROR');
-      throw err;
     }
+
+    if (!this.poseLandmarker) {
+      this.updateState('ERROR', new Error('Pose model failed to initialize prior to tracking.'));
+      return;
+    }
+
+    this.updateState('TRACKING');
+    this.predictWebcam();
   }
 
-  public stopCamera(): void {
-    if (this.cameraStream) {
-      this.cameraStream.getTracks().forEach(track => track.stop());
-      this.cameraStream = null;
+  public stopTracking(): void {
+    if (this.activeRequestAnimationFrame !== null) {
+      cancelAnimationFrame(this.activeRequestAnimationFrame);
+      this.activeRequestAnimationFrame = null;
     }
-    if (this.videoElement) {
-      this.videoElement.srcObject = null;
-      this.videoElement = null;
-    }
+    
     if (this.canvasElement) {
        const ctx = this.canvasElement.getContext("2d");
        if (ctx) ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
        this.canvasElement = null;
     }
-    if (this.activeRequestAnimationFrame !== null) {
-      cancelAnimationFrame(this.activeRequestAnimationFrame);
-      this.activeRequestAnimationFrame = null;
+    
+    this.videoElement = null;
+    
+    if (this.state === 'TRACKING' || this.state === 'PAUSED') {
+       this.updateState('STOPPED');
     }
   }
 
@@ -166,13 +123,13 @@ export class PoseDetectionService {
     
     const detect = async () => {
       // If stopped or not ready, exit loop cleanly
-      if (!this.videoElement || !this.poseLandmarker || !this.canvasElement) {
+      if (!this.videoElement || !this.poseLandmarker || !this.canvasElement || this.state !== 'TRACKING') {
         this.activeRequestAnimationFrame = null;
         return;
       }
 
       const now = performance.now();
-      // Throttle analysis to ~30 FPS (33ms) to prevent blocking main thread too much
+      // Throttle analysis to ~30 FPS (33ms)
       if (now - lastAnalysisTime >= 33 && this.videoElement.currentTime !== lastVideoTime) {
         lastAnalysisTime = now;
         lastVideoTime = this.videoElement.currentTime;
@@ -186,7 +143,6 @@ export class PoseDetectionService {
             ctx.clearRect(0, 0, this.canvasElement.width, this.canvasElement.height);
             
             if (results.landmarks && results.landmarks.length > 0) {
-                // Get the simple skeleton data
                 const simpleSkeleton = this.visualMapper.map(results.landmarks[0]);
                 if (simpleSkeleton) {
                     const width = this.canvasElement.width;
@@ -198,11 +154,10 @@ export class PoseDetectionService {
                       ctx.arc(point.x * width, point.y * height, 4, 0, 2 * Math.PI);
                       ctx.fillStyle = 'rgba(0, 255, 255, 0.9)';
                       ctx.fill();
-                      // Optional glow
                       ctx.shadowBlur = 10;
                       ctx.shadowColor = 'rgba(0, 255, 255, 0.8)';
                       ctx.fill();
-                      ctx.shadowBlur = 0; // reset
+                      ctx.shadowBlur = 0; 
                     };
 
                     const drawLine = (p1: any, p2: any) => {
@@ -215,33 +170,24 @@ export class PoseDetectionService {
                       ctx.stroke();
                     };
 
-                    // Draw connections
                     drawLine(simpleSkeleton.head, simpleSkeleton.neck);
-                    
                     drawLine(simpleSkeleton.neck, simpleSkeleton.leftShoulder);
                     drawLine(simpleSkeleton.neck, simpleSkeleton.rightShoulder);
-                    
                     drawLine(simpleSkeleton.leftShoulder, simpleSkeleton.leftElbow);
                     drawLine(simpleSkeleton.leftElbow, simpleSkeleton.leftWrist);
-                    
                     drawLine(simpleSkeleton.rightShoulder, simpleSkeleton.rightElbow);
                     drawLine(simpleSkeleton.rightElbow, simpleSkeleton.rightWrist);
-                    
                     drawLine(simpleSkeleton.neck, simpleSkeleton.torso);
                     drawLine(simpleSkeleton.torso, simpleSkeleton.waist);
-                    
                     drawLine(simpleSkeleton.waist, simpleSkeleton.leftHip);
                     drawLine(simpleSkeleton.waist, simpleSkeleton.rightHip);
-                    
                     drawLine(simpleSkeleton.leftHip, simpleSkeleton.leftKnee);
                     drawLine(simpleSkeleton.leftKnee, simpleSkeleton.leftAnkle);
                     drawLine(simpleSkeleton.leftAnkle, simpleSkeleton.leftFoot);
-                    
                     drawLine(simpleSkeleton.rightHip, simpleSkeleton.rightKnee);
                     drawLine(simpleSkeleton.rightKnee, simpleSkeleton.rightAnkle);
                     drawLine(simpleSkeleton.rightAnkle, simpleSkeleton.rightFoot);
 
-                    // Draw points on top of lines
                     const points = [
                       simpleSkeleton.head, simpleSkeleton.neck,
                       simpleSkeleton.leftShoulder, simpleSkeleton.rightShoulder,
@@ -263,7 +209,6 @@ export class PoseDetectionService {
           if (this.onPoseDetected && results.landmarks && results.landmarks.length > 0) {
             this.onPoseDetected(results, this.videoElement.videoWidth, this.videoElement.videoHeight);
           } else if (this.onPoseDetected) {
-            // Send null so the analysis engine knows tracking is lost
             this.onPoseDetected(null, this.videoElement.videoWidth, this.videoElement.videoHeight);
           }
         } catch(e) {
@@ -276,10 +221,6 @@ export class PoseDetectionService {
 
     detect();
   };
-
-  public isReady(): boolean {
-    return this.isInitialized;
-  }
 }
 
 export const poseDetectionService = PoseDetectionService.getInstance();
