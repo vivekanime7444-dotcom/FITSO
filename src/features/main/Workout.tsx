@@ -203,7 +203,7 @@ export const Workout: React.FC = () => {
       const camService = cameraService;
 
       // Only start if exercise is supported (simple check for now)
-      const isSupported = def && ['push-up', 'squat', 'lunge', 'curl'].some(k => def.name.toLowerCase().includes(k));
+      const isSupported = def && ['push-up', 'squat', 'lunge', 'curl', 'pull-up', 'chin-up'].some(k => def.name.toLowerCase().includes(k));
 
       if (isSupported && videoRef.current && canvasRef.current) {
         // Start engine

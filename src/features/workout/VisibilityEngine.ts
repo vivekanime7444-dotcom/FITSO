@@ -27,6 +27,12 @@ export class VisibilityEngine {
     return this.evaluateRequirements(frame, ['Shoulder', 'Elbow', 'Wrist']);
   }
 
+  public static evaluatePullUp(frame: SkeletonFrame): VisibilityReport {
+    // Pull-up Primary: Shoulders, Elbows, Wrists
+    // Lower body is optional (often cropped)
+    return this.evaluateRequirements(frame, ['Shoulder', 'Elbow', 'Wrist']);
+  }
+
   private static evaluateRequirements(frame: SkeletonFrame, primaryJoints: string[]): VisibilityReport {
     let leftPrimaryScore = 0;
     let rightPrimaryScore = 0;

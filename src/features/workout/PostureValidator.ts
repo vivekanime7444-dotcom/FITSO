@@ -80,4 +80,18 @@ export class PostureValidator {
 
     return true;
   }
+  public static isReadyForPullUp(frame: SkeletonFrame): boolean {
+    const posture = this.classifyPosture(frame);
+    if (posture === 'HORIZONTAL' || posture === 'UNKNOWN') return false;
+
+    const wrist = (frame.leftWrist && frame.leftWrist.confidence > 0.4) ? frame.leftWrist : frame.rightWrist;
+    const shoulder = (frame.leftShoulder && frame.leftShoulder.confidence > 0.4) ? frame.leftShoulder : frame.rightShoulder;
+    
+    if (shoulder && wrist) {
+      // Wrist Y should be LESS than shoulder Y (higher on screen)
+      if (wrist.y > shoulder.y + 0.1) return false;
+    }
+
+    return true;
+  }
 }

@@ -8,6 +8,7 @@ import type { TrackingStatus } from './VisibilityEngine';
 import { PushUpAnalyzer } from './analyzers/PushUpAnalyzer';
 import { SquatAnalyzer } from './analyzers/SquatAnalyzer';
 import { CurlAnalyzer } from './analyzers/CurlAnalyzer';
+import { PullUpAnalyzer } from './analyzers/PullUpAnalyzer';
 import { RepStateMachine, type RepState } from './RepStateMachine';
 import { MovementTracker } from './MovementTracker';
 
@@ -124,6 +125,14 @@ export class ExerciseAnalysisEngine {
       isPostureValid = PostureValidator.isReadyForCurl(frame);
       if (trackingStatus !== 'PAUSED') {
          rom = CurlAnalyzer.getROM(frame, orientation, visibility);
+      }
+    } else if (this.currentExercise.includes('pull-up') || this.currentExercise.includes('chin-up')) {
+      const visibility = VisibilityEngine.evaluatePullUp(frame);
+      trackingStatus = visibility.status;
+      primarySide = visibility.primarySide;
+      isPostureValid = PostureValidator.isReadyForPullUp(frame);
+      if (trackingStatus !== 'PAUSED') {
+         rom = PullUpAnalyzer.getROM(frame, orientation, visibility);
       }
     } else {
       trackingStatus = 'PAUSED';
